@@ -7,12 +7,14 @@ from typing import Optional
 class FFNN(nn.Module):
     def __init__(self, d_model: int, d_ff: int) -> None:
         super(FFNN, self).__init__()
-        self.fc1 = nn.Linear(d_model, d_ff)
-        self.fc2 = nn.Linear(d_ff, d_model)
-        self.relu = nn.ReLU()
+        self.network = nn.Sequential(
+            nn.Linear(d_model, d_ff),
+            nn.ReLU(),
+            nn.Linear(d_ff, d_model)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.fc2(self.relu(self.fc1(x)))
+        return self.network(x)
     
 
 class DecoderLayer(nn.Module):
