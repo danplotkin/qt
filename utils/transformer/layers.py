@@ -5,6 +5,7 @@ from typing import Optional
 
 
 class FFNN(nn.Module):
+    """Feed-forward network used in each Transformer layer."""
     def __init__(self, d_model: int, d_ff: int) -> None:
         super(FFNN, self).__init__()
         self.network = nn.Sequential(
@@ -14,10 +15,12 @@ class FFNN(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply two-layer feed-forward transformation to input."""
         return self.network(x)
     
 
 class DecoderLayer(nn.Module):
+    """A single layer of the Transformer decoder (no cross-attention)."""
     def __init__(self, d_model: int, num_heads: int, d_ff: int, dropout: float) -> None:
         super(DecoderLayer, self).__init__()
         self.self_attn = MultiHeadAttention(d_model, num_heads)
@@ -27,6 +30,7 @@ class DecoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, x: torch.Tensor, tgt_mask: Optional[torch.Tensor]) -> torch.Tensor:
+        """Apply self-attention and feed-forward layers to input sequence."""
         attn_output = self.self_attn(x, x, x, tgt_mask)
         x = self.norm1(x + self.dropout(attn_output))
         ff_output = self.feed_forward(x)
@@ -35,6 +39,7 @@ class DecoderLayer(nn.Module):
     
 
 class SinusoidalPositionalEncoding(nn.Module):
+    """Adds sinusoidal positional encoding to token embeddings."""
     def __init__(self, d_model: int, max_seq_length: int) -> None:
         super(SinusoidalPositionalEncoding, self).__init__()
         
@@ -48,10 +53,12 @@ class SinusoidalPositionalEncoding(nn.Module):
         self.register_buffer('pe', pe.unsqueeze(0))
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Add positional encodings to input tensor."""
         return x + self.pe[:, :x.size(1)]
     
 
 class MultiHeadAttention(nn.Module):
+    """Multi-head self-attention mechanism used in Transformer models."""
     def __init__(self, d_model: int, num_heads: int) -> None:
         super(MultiHeadAttention, self).__init__()
         assert d_model % num_heads == 0
@@ -66,6 +73,7 @@ class MultiHeadAttention(nn.Module):
         self.W_o = nn.Linear(d_model, d_model)
         
     def scaled_dot_product_attention(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Compute attention output using scaled dot-product with optional masking."""
         attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
         
         if mask is not None:
@@ -77,14 +85,17 @@ class MultiHeadAttention(nn.Module):
         return output
         
     def split_heads(self, x: torch.Tensor) -> torch.Tensor:
+        """Split input tensor into multiple attention heads."""
         batch_size, seq_length, d_model = x.size()
         return x.view(batch_size, seq_length, self.num_heads, self.d_k).transpose(1, 2)
         
     def combine_heads(self, x: torch.Tensor) -> torch.Tensor:
+        """Combine attention heads back into a single tensor."""
         batch_size, _, seq_length, d_k = x.size()
         return x.transpose(1, 2).contiguous().view(batch_size, seq_length, self.d_model)
         
     def forward(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Compute multi-head attention output from input queries, keys, and values."""
         Q = self.split_heads(self.W_q(Q))
         K = self.split_heads(self.W_k(K))
         V = self.split_heads(self.W_v(V))

@@ -13,6 +13,7 @@ class Transformer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def generate_mask(self, tgt: torch.Tensor) -> torch.Tensor:
+        """Generate casual and padding mask"""
         tgt_mask = (tgt != 0).unsqueeze(1).unsqueeze(3)
         seq_length = tgt.size(1)
         nopeak_mask = (1 - torch.triu(torch.ones(1, seq_length, seq_length), diagonal=1)).bool().to(tgt.device)
@@ -20,6 +21,7 @@ class Transformer(nn.Module):
         return tgt_mask
 
     def forward(self, tgt: torch.Tensor) -> torch.Tensor:
+        """Decoder-only transformer forward pass"""
         tgt_mask = self.generate_mask(tgt)
         tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt)))
 
