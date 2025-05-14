@@ -1,8 +1,11 @@
 from utils.transformer.layers import *
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.distributions import Categorical
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
 from typing import Union, Literal
+
 
 class Transformer(nn.Module):
     def __init__(
@@ -16,6 +19,7 @@ class Transformer(nn.Module):
         device: torch.device
     ) -> None:
         super(Transformer, self).__init__()
+        self.max_seq_length = max_seq_length
         self.to(device) # Put model on device on init
         self.device = device
         self.tokenizer = tokenizer
@@ -83,12 +87,12 @@ class Transformer(nn.Module):
 
     @torch.no_grad()
     def _decode_greedy(self, text: str, max_tokens: int = 100, return_tokens: bool = False) -> Union[str, list[int]]:
-        trg = self.tokenizer.encode(text, return_tensors='pt').to(self.device) # Tokenize text
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device) # Tokenize text
         inference_tokens = []
         
         for _ in range(max_tokens):
-            logits = self.forward(trg=trg)
-            next_token = torch.argmax(logits[:, -1], dim=-1)  # [batch]
+            logits = self.forward(tgt=tgt)
+            next_token = torch.argmax(logits[:, -1, :], dim=-1)  # [batch]          
 
             # Check for end of seq
             if next_token.item() == self.tokenizer.eos_token_id:  # EOS token for GPT2 tokenier
@@ -97,9 +101,9 @@ class Transformer(nn.Module):
             # Append to inference token
             inference_tokens.append(next_token.item())
 
-            # Append next token to trg
-            trg = torch.cat([trg, next_token.unsqueeze(0)], dim=1)
-            trg = trg[:, -self.seqlen:]  # context cuttoff
+            # Append next token to tgt
+            tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
+            tgt = tgt[:, -self.max_seq_length:]  # context cuttoff
 
         if return_tokens:
             return inference_tokens
@@ -107,8 +111,59 @@ class Transformer(nn.Module):
     
     @torch.no_grad()
     def _decode_beam(self, text: str, max_tokens: int = 100, return_tokens: bool = False, beam_size: int = 3) -> Union[str, list[int]]:
-        raise NotImplementedError
-    
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device)
+        sequences = [(tgt, 0)]  # (tokens, log_prob)
+
+        for _ in range(max_tokens):
+            all_candidates = []
+            for seq, score in sequences:
+                if seq[0, -1].item() == self.tokenizer.eos_token_id:
+                    all_candidates.append((seq, score))
+                    continue
+
+                logits = self.forward(tgt=seq)[:, -1, :]
+                log_probs = F.log_softmax(logits, dim=-1)
+                topk_log_probs, topk_indices = torch.topk(log_probs, beam_size)
+
+                for i in range(beam_size):
+                    candidate_seq = torch.cat([seq, topk_indices[:, i].unsqueeze(0)], dim=-1)
+                    candidate_score = score + topk_log_probs[0, i].item()
+                    all_candidates.append((candidate_seq, candidate_score))
+
+            sequences = sorted(all_candidates, key=lambda tup: tup[1] / len(tup[0][0]), reverse=True)[:beam_size]
+
+            # Early stop if all sequences end with EOS
+            if all(seq[0, -1].item() == self.tokenizer.eos_token_id for seq, _ in sequences):
+                break
+
+        best_seq = sequences[0][0][0, tgt.size(1):]  # Remove prompt
+        if return_tokens:
+            return best_seq.tolist()
+        return self.tokenizer.decode(best_seq)
+
     @torch.no_grad()
     def _decode_sample(self, text: str, max_tokens: int = 100, return_tokens: bool = False, tau: float = 1.0) -> Union[str, list[int]]:
-        raise NotImplementedError
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device) # Tokenize text
+        inference_tokens = []
+
+        for _ in range(max_tokens):
+            logits = self.forward(tgt=tgt)
+
+            # Apply tempurature sampling 
+            dist = Categorical(logits=logits[:, -1, :]/tau)
+            next_token = dist.sample() # (batch)
+
+            # Check for end of seq
+            if next_token.item() == self.tokenizer.eos_token_id:  # EOS token for GPT2 tokenier
+                break
+
+            # Append to inference token
+            inference_tokens.append(next_token.item())
+
+            # Append next token to tgt
+            tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
+            tgt = tgt[:, -self.max_seq_length:]  # context cuttoff
+
+        if return_tokens:
+            return inference_tokens
+        return self.tokenizer.decode(inference_tokens)
