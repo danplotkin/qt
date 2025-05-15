@@ -1,0 +1,21 @@
+training:
+  learning_rate: 1e-4
+  batch_size: 32
+  epochs: 10
+  optimizer: AdamW
+  weight_decay: 0.01
+  output_dir: "./checkpoints"
+  early_stopping: true
+  early_stopping_patience: 5
+  early_stopping_min_delta: 0.001
+  early_stopping_mode: "min"
+  restore_best_model: true
+
+transformer:
+  tgt_vocab_size: 30522
+  d_model: 768
+  num_heads: 8
+  num_layers: 6
+  d_ff: 2048
+  max_seq_length: 512
+  dropout: 0.1

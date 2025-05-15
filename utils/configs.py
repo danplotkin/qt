@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from torch.optim import Optimizer, AdamW
+import yaml
 
 
 @dataclass
@@ -28,3 +29,24 @@ class TransformerConfigs:
     d_ff: int = 3072
     max_seq_length: int = 512
     dropout: float = 0.1
+
+
+def load_configs(path: str = "configs.yaml") -> dict[str, object]:
+    """
+    Load configuration values from a YAML file and return TrainingConfigs and TransformerConfigs instances.
+    Expects the YAML structure:
+    training:
+      <TrainingConfigs fields>
+    transformer:
+      <TransformerConfigs fields>
+    """
+    with open(path, "r") as f:
+        cfg = yaml.safe_load(f) or {}
+    train_cfg = cfg.get("training", {})
+    trans_cfg = cfg.get("transformer", {})
+    training = TrainingConfigs(**train_cfg)
+    transformer = TransformerConfigs(**trans_cfg)
+    return {
+        "training": training,
+        "transformer": transformer
+    }
