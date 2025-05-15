@@ -4,9 +4,42 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional
+import copy
 
 from tqdm import tqdm
 from utils.configs import TrainingConfigs
+import numpy as np
+
+
+class EarlyStopping:
+    """
+    Stops training if a monitored metric stops improving.
+    """
+    def __init__(self, patience: int = 3, min_delta: float = 0.0, mode: str = 'min') -> None:
+        self.patience = patience
+        self.min_delta = min_delta
+        self.mode = mode
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.best_state: Optional[dict] = None
+        if mode == 'min':
+            self.monitor_op = lambda current, best: current < best - self.min_delta
+        else:
+            self.monitor_op = lambda current, best: current > best + self.min_delta
+
+    def __call__(self, current_score: float, model: nn.Module) -> None:
+        if self.best_score is None:
+            self.best_score = current_score
+            self.best_state = copy.deepcopy(model.state_dict())
+        elif self.monitor_op(current_score, self.best_score):
+            self.best_score = current_score
+            self.counter = 0
+            self.best_state = copy.deepcopy(model.state_dict())
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
 
 
 class Trainer:
@@ -46,6 +79,15 @@ class Trainer:
             'train_acc': [],
             'val_acc': []
         }
+        # Initialize early stopping if configured
+        if self.config.early_stopping:
+            self.early_stopping = EarlyStopping(
+                patience=self.config.early_stopping_patience,
+                min_delta=self.config.early_stopping_min_delta,
+                mode=self.config.early_stopping_mode
+            )
+        else:
+            self.early_stopping = None
 
     def train(self) -> None:
         """
@@ -85,8 +127,19 @@ class Trainer:
                 val_loss = self.evaluate()
                 self.history['val_loss'].append(val_loss)
                 self.history['val_acc'].append(self.last_val_accuracy)
+
             self.history['train_loss'].append(avg_loss)
             self.history['train_acc'].append(avg_accuracy)
+
+            # Check early stopping based on validation loss
+            if self.early_stopping is not None and self.val_loader is not None:
+                self.early_stopping(val_loss, self.model)
+                if self.early_stopping.early_stop:
+                    print("Early stopping triggered.")
+                    if self.config.restore_best_model and self.early_stopping.best_state is not None:
+                        print("Restoring best model weights from epoch with optimal metric.")
+                        self.model.load_state_dict(self.early_stopping.best_state)
+                    break
 
     def evaluate(self) -> float:
         """

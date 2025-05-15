@@ -11,6 +11,12 @@ class TrainingConfigs:
     num_epochs: int = 3
     output_dir: str = "./checkpoints"
     optimizer: type[Optimizer] = AdamW
+    # Early stopping configurations
+    early_stopping: bool = False
+    early_stopping_patience: int = 3
+    early_stopping_min_delta: float = 0.0
+    early_stopping_mode: str = 'min'  # 'min' for loss, 'max' for accuracy
+    restore_best_model: bool = True  # restore model weights from best epoch upon early stopping
 
 
 @dataclass
