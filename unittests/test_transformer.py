@@ -2,7 +2,7 @@ import sys
 import os
 import unittest
 sys.path.append(os.getcwd())
-from utils.transformer.model import Transformer
+from utils.transformer.models import QT
 import torch
 import torch.nn as nn
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
@@ -11,7 +11,7 @@ from transformers import GPT2Tokenizer, GPT2TokenizerFast
 class TestTransformerModel(unittest.TestCase):
     @torch.no_grad()
     def test_forward_output_shape(self):
-        model = Transformer(
+        model = QT(
             tgt_vocab_size=100,
             d_model=100,
             num_heads=2,

@@ -2,11 +2,11 @@ import sys
 import os
 import unittest
 sys.path.append(os.getcwd())
-from utils.transformer.model import Transformer
+from utils.transformer.models import QT
 import torch
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
 
-MODEL = Transformer(
+MODEL = QT(
     tgt_vocab_size=100,
     d_model=100,
     num_heads=2,

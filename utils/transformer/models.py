@@ -7,7 +7,7 @@ from transformers import GPT2Tokenizer, GPT2TokenizerFast
 from typing import Union, Literal
 
 
-class Transformer(nn.Module):
+class QT(nn.Module):
     def __init__(
         self, 
         tgt_vocab_size: int, 
@@ -18,7 +18,7 @@ class Transformer(nn.Module):
         tokenizer: Union[GPT2Tokenizer, GPT2TokenizerFast],
         device: torch.device
     ) -> None:
-        super(Transformer, self).__init__()
+        super(QT, self).__init__()
         self.max_seq_length = max_seq_length
         self.to(device) # Put model on device on init
         self.device = device

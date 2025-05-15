@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from utils.configs import TrainingConfigs, TransformerConfigs
-from utils.transformer.model import Transformer
+from utils.transformer.models import QT
 from utils.metrics import MaskedAccuracy
 from utils.training import Trainer
 from utils.tokenizer import get_tokenizer
@@ -25,7 +25,7 @@ def test_trainer_runs_without_error():
     tokenizer = get_tokenizer()
 
     # Model
-    model = Transformer(
+    model = QT(
         tgt_vocab_size=transformer_config.tgt_vocab_size,
         d_model=transformer_config.d_model,
         num_heads=transformer_config.num_heads,
