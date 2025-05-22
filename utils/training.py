@@ -9,6 +9,8 @@ import copy
 from tqdm import tqdm
 from utils.configs import TrainingConfigs
 import numpy as np
+from utils.metrics import BaseMetric
+from utils.losses import BaseLoss
 
 
 class EarlyStopping:
@@ -61,8 +63,8 @@ class Trainer:
         train_loader: torch.utils.data.DataLoader,
         val_loader: Optional[torch.utils.data.DataLoader],
         config: TrainingConfigs,
-        criterion: nn.Module,
-        metric: callable,
+        criterion: BaseLoss,
+        metric: BaseMetric,
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     ) -> None:
         self.model = model.to(device)
@@ -101,24 +103,23 @@ class Trainer:
             sum_acc = 0.0
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for i, (inputs, targets) in pbar:
+                # target is shaped (batch, seq_len)
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
-                outputs = self.model(inputs)
+                logits = self.model(inputs) # batch, seq_len, vocab_size
                 # Shift for next-token prediction
-                logits = outputs[:, :-1, :]
-                target_tokens = targets[:, 1:]
-                loss = self.criterion(logits.reshape(-1, logits.size(-1)), target_tokens.reshape(-1))
+                loss = self.criterion(logits, targets)
                 loss.backward()
                 self.optimizer.step()
 
                 epoch_loss += loss.item()
 
-                batch_acc = self.metric(logits, target_tokens)
+                batch_acc = self.metric(logits, targets)
                 sum_acc += batch_acc.item()
 
                 train_loss = epoch_loss / (i + 1)
                 train_acc = sum_acc / (i + 1)
-                pbar.set_description(f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}")
+                pbar.set_description(f"Train {self.criterion.name}: {train_loss:.4f}, Train {self.metric.name}: {train_acc:.4f}")
             avg_loss = epoch_loss / len(self.train_loader)
             avg_accuracy = sum_acc / len(self.train_loader)
             print()
@@ -158,17 +159,15 @@ class Trainer:
                 batch_num = i + 1
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 outputs = self.model(inputs)
-                logits = outputs[:, :-1, :]
-                target_tokens = targets[:, 1:]
-                loss = self.criterion(logits.reshape(-1, logits.size(-1)), target_tokens.reshape(-1))
+                loss = self.criterion(outputs, targets)
                 total_loss += loss.item()
 
-                batch_acc = self.metric(logits, target_tokens)
+                batch_acc = self.metric(outputs, targets)
                 sum_acc += batch_acc.item()
 
                 avg_loss = total_loss / batch_num
                 avg_accuracy = sum_acc / batch_num
-                pbar.set_description(f"Eval Loss: {avg_loss:.4f}, Eval Acc: {avg_accuracy:.4f}")
+                pbar.set_description(f"Eval {self.criterion.name}: {avg_loss:.4f}, Eval {self.metric.name}: {avg_accuracy:.4f}")
 
         avg_loss = total_loss / len(self.val_loader)
         avg_accuracy = sum_acc / len(self.val_loader)

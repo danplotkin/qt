@@ -9,6 +9,8 @@ from utils.transformer.models import QT
 from utils.metrics import MaskedAccuracy
 from utils.training import Trainer
 from utils.tokenizer import get_tokenizer
+from utils.losses import SequenceLoss, LastTokenLoss
+
 
 def test_trainer_runs_without_error():
     # Create dummy data
@@ -37,27 +39,25 @@ def test_trainer_runs_without_error():
         device=torch.device("cpu")
     )
 
-    # Loss and metric
-    criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
+    # Metric
     metric = MaskedAccuracy(padding_token_id=tokenizer.pad_token_id)
 
-    # Trainer
-    trainer = Trainer(
-        model=model,
-        train_loader=loader,
-        val_loader=loader,
-        config=config,
-        criterion=criterion,
-        metric=metric,
-        device="cpu"
-    )
+    # Test both loss functions
+    for criterion in [SequenceLoss(ignore_index=tokenizer.pad_token_id), LastTokenLoss(ignore_index=tokenizer.pad_token_id)]:
+        trainer = Trainer(
+            model=model,
+            train_loader=loader,
+            val_loader=loader,
+            config=config,
+            criterion=criterion,
+            metric=metric,
+            device="cpu"
+        )
 
-    # Run training
-    trainer.train()
+        trainer.train()
 
-    # Assert model trained and history recorded
-    assert len(trainer.history['train_loss']) == config.num_epochs
-    assert len(trainer.history['train_acc']) == config.num_epochs
+        assert len(trainer.history['train_loss']) == config.num_epochs
+        assert len(trainer.history['train_acc']) == config.num_epochs
 
 
 if __name__ == '__main__':
