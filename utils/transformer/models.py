@@ -5,6 +5,10 @@ from torch.distributions import Categorical
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
 from typing import Union, Literal
 
+import numpy as np
+import collections
+from tqdm import tqdm
+
 from utils.transformer.layers import *
 
 
@@ -29,6 +33,42 @@ class QT(nn.Module):
         self.decoder_layers = nn.ModuleList([DecoderLayer(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)])
         self.fc = nn.Linear(d_model, tgt_vocab_size)
         self.dropout = nn.Dropout(dropout)
+
+    def initialize_output_bias(self, token_sequences: list[list[int]]):
+        """
+        Initializes the output layer's bias based on token frequency distribution.
+
+        Args:
+            token_sequences: A list of token ID lists.
+        Notes:
+            All special tokens, as defined by self.tokenizer.all_special_ids, are excluded from frequency counts.
+        """
+        counts = collections.Counter()
+        for tokens in tqdm(token_sequences, desc="Counting token frequencies"):
+            counts.update(tokens)
+
+        vocab_size = self.decoder_embedding.num_embeddings
+        counts_arr = np.zeros(shape=(vocab_size,))
+        for idx, count in counts.items():
+            if idx < vocab_size:
+                counts_arr[idx] = count
+
+        # Zero out counts for all special tokens defined by the tokenizer
+        for special_id in self.tokenizer.all_special_ids:
+            if special_id < vocab_size:
+                counts_arr[special_id] = 0
+
+        total = counts_arr.sum()
+        p = counts_arr / total
+        p[counts_arr == 0] = 1.0
+        log_p = np.log(p)
+
+        entropy = -(log_p * p).sum()
+        print(f"\nUniform entropy: {np.log(vocab_size):0.2f}")
+        print(f"Marginal entropy: {entropy:0.2f}")
+
+        log_p[counts_arr == 0] = -1e9
+        self.fc.bias.data = torch.tensor(log_p, dtype=torch.float32, device=self.device)
 
     def generate_mask(self, tgt: torch.Tensor) -> torch.Tensor:
         """Generate casual and padding mask"""
@@ -59,7 +99,7 @@ class QT(nn.Module):
     def decode(
         self,
         text: str,
-        method: Literal["greedy", "beam", "sample"] = "greedy",
+        method: Literal["greedy", "beam", "sample", "topk"] = "greedy",
         max_tokens: int = 100,
         return_tokens: bool = False,
         beam_size: int = 3,
@@ -69,10 +109,10 @@ class QT(nn.Module):
         Decode text using specified decoding strategy.
         Args:
             text: input prompt
-            method: decoding strategy - 'greedy', 'beam', or 'sample'
+            method: decoding strategy - 'greedy', 'beam', 'sample', or 'topk'
             max_tokens: max tokens to generate
             return_tokens: if True, return token ids instead of text
-            beam_size: beam width for beam search
+            beam_size: beam width for beam search or top-k
             tau: temperature for sampling
         Returns:
             Generated text or token list
@@ -83,6 +123,10 @@ class QT(nn.Module):
             return self._decode_beam(text, max_tokens=max_tokens, return_tokens=return_tokens, beam_size=beam_size)
         elif method == "sample":
             return self._decode_sample(text, max_tokens=max_tokens, return_tokens=return_tokens, tau=tau)
+        elif method == "topk":
+            return self._decode_topk(
+                text, max_tokens=max_tokens, return_tokens=return_tokens, k=beam_size
+            )
         else:
             raise ValueError(f"Unsupported decode method: {method}")
 
@@ -165,6 +209,40 @@ class QT(nn.Module):
             tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
             tgt = tgt[:, -self.max_seq_length:]  # context cuttoff
 
+        if return_tokens:
+            return inference_tokens
+        return self.tokenizer.decode(inference_tokens)
+
+    @torch.no_grad()
+    def _decode_topk(
+        self,
+        text: str,
+        max_tokens: int = 100,
+        return_tokens: bool = False,
+        k: int = 10
+    ) -> Union[str, list[int]]:
+        """
+        Top-k sampling decoding: at each step, sample from the top k logits.
+        """
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device)
+        inference_tokens = []
+
+        for _ in range(max_tokens):
+            logits = self.forward(tgt=tgt)[:, -1, :]  # [batch, vocab]
+            # Keep only top k logits
+            topk_vals, topk_idx = torch.topk(logits, k, dim=-1)
+            mask = torch.full_like(logits, float('-inf'))
+            mask.scatter_(1, topk_idx, topk_vals)
+            dist = Categorical(logits=mask)
+            next_token = dist.sample()  # (batch)
+
+            if next_token.item() == self.tokenizer.eos_token_id:
+                break
+
+            inference_tokens.append(next_token.item())
+            tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
+            tgt = tgt[:, -self.max_seq_length:]
+        
         if return_tokens:
             return inference_tokens
         return self.tokenizer.decode(inference_tokens)
