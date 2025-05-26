@@ -3,8 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
-from typing import Union, Literal
-
+from typing import Union, Literal, Iterable
 import numpy as np
 import collections
 from tqdm import tqdm
@@ -34,18 +33,16 @@ class QT(nn.Module):
         self.fc = nn.Linear(d_model, tgt_vocab_size)
         self.dropout = nn.Dropout(dropout)
 
-    def initialize_output_bias(self, token_sequences: list[list[int]]):
+    def initialize_output_bias(self, token_sequences: Iterable[int]):
         """
         Initializes the output layer's bias based on token frequency distribution.
 
         Args:
-            token_sequences: A list of token ID lists.
+            token_sequences: An iterable of token IDs.
         Notes:
             All special tokens, as defined by self.tokenizer.all_special_ids, are excluded from frequency counts.
         """
-        counts = collections.Counter()
-        for tokens in tqdm(token_sequences, desc="Counting token frequencies"):
-            counts.update(tokens)
+        counts = collections.Counter(token_sequences)
 
         vocab_size = self.decoder_embedding.num_embeddings
         counts_arr = np.zeros(shape=(vocab_size,))
