@@ -171,15 +171,15 @@ class QT(nn.Module):
     
 if __name__ == '__main__':
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    qt = QT(
-        tgt_vocab_size = , 
-        d_model = , 
-        num_heads = , 
-        num_layers = , 
-        d_ff = , 
-        max_seq_length = 1024, 
-        dropout = 0.1,
-        tokenizer = GPT2TokenizerFast,
-        device = device)
+    # qt = QT(
+    #     tgt_vocab_size = , 
+    #     d_model = , 
+    #     num_heads = , 
+    #     num_layers = , 
+    #     d_ff = , 
+    #     max_seq_length = 1024, 
+    #     dropout = 0.1,
+    #     tokenizer = GPT2TokenizerFast,
+    #     device = device)
