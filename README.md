@@ -25,7 +25,7 @@ TODO
 ## Data
 
 For pretraining, in order of training...
-- [Reddit Comments](https://huggingface.co/datasets/HuggingFaceGECLM/REDDIT_comments) (109GB total, will reduce)
+- [Reddit Comments](https://huggingface.co/datasets/HuggingFaceGECLM/REDDIT_comments) (109GB total)
 - [2022 English Wikipedia](https://huggingface.co/datasets/legacy-datasets/wikipedia) (20GB)
 - [MiniPile](https://huggingface.co/datasets/JeanKaddour/minipile) (5.6GB)
 - bookscorpus (4.4GB)
@@ -40,20 +40,21 @@ For instruction tuning:
     - Change parameter precision
     - [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
     - Decide architecture parameters: 
-        - `tgt_vocab_size` = ``
-        - `d_model` = ``
-        - `num_heads` = ``
-        - `num_layers` = ``
-        - `d_ff` = ``
+        - `tgt_vocab_size` = `50257`
+        - `d_model` = `2048`
+        - `d_ff` = `8192`
+        - `num_heads` = `16`
+        - `num_layers` = `14`
         - `max_seq_length` = `512`
         - `dropout` = `0.1`
 
-        The number of parameters in a decoder layer is roughly $4d_{model}^2 + 2*d_{model}*d_{ff}$
+        This corresponds with `1,042,538,496` parameters, and with tied embeddings:
+        - `939k` non-embedding parameters
+        - `103k` embedding parameters
 
-        This corresponds with...
-        - `x` embedding parameters
-        - `y` non-embedding parameters
-    - Tied embeddings?
+        Training with Adam for fp32 params 
+
+    - Tie embeddings
 - Training:
     - Gradient clipping
     - External logging
