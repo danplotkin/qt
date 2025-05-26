@@ -1,6 +1,4 @@
-# qt - A 1B Parameter Language Model
-
-Members: Daniel Plotkin, Jack Hanke, Nicole Birova
+# Introducing... qT!
 
 ```
            ___        ___             
@@ -12,20 +10,22 @@ Members: Daniel Plotkin, Jack Hanke, Nicole Birova
           \88/  /   /8/  \/__/        
           /8/__/   /8/  /             
           \8\__\   \/__/              
-           \/__/                                                        
+           \/__/                                                  
 ```
+
+A 1B parameter language model created by Daniel Plotkin, Jack Hanke, and Nicole Birova.
 
 ## Model Card
 
 Tokenizer:
-- [Tokenizer](https://github.com/huggingface/tokenizers)
+- [GPT2 Tokenizer](https://github.com/huggingface/tokenizers)
 
 TODO
 
 ## Data
 
 For pretraining, in order of training...
-- [Reddit Comments](https://huggingface.co/datasets/HuggingFaceGECLM/REDDIT_comments) (109GB total)
+- [Reddit Comments](https://huggingface.co/datasets/HuggingFaceGECLM/REDDIT_comments) (109GB)
 - [2022 English Wikipedia](https://huggingface.co/datasets/legacy-datasets/wikipedia) (20GB)
 - [MiniPile](https://huggingface.co/datasets/JeanKaddour/minipile) (5.6GB)
 - bookscorpus (4.4GB)
@@ -37,33 +37,31 @@ For instruction tuning:
 ## Project TODOs
 
 - Model design:
-    - Change parameter precision
+    - Change parameter precision to `fp32`
     - [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
-    - Decide architecture parameters: 
+    - Tie embeddings
+    - Architecture parameters: 
         - `tgt_vocab_size` = `50257`
         - `d_model` = `2048`
         - `d_ff` = `8192`
+        - `max_seq_length` = `2048`
         - `num_heads` = `16`
         - `num_layers` = `14`
-        - `max_seq_length` = `512`
         - `dropout` = `0.1`
 
-        This corresponds with `1,042,538,496` parameters, and with tied embeddings:
+        qT has `1,042,538,496` parameters (tied embeddings):
         - `939k` non-embedding parameters
         - `103k` embedding parameters
 
-        Training with Adam for fp32 params 
+        Training with Adam for `fp32` params with take up atleast `24GBs`, and for inference the model will take up `5GBs`.
 
-    - Tie embeddings
 - Training:
     - Gradient clipping
     - External logging
-    - 
 - Data:
     - Decide how to best pull, tokenize, and save data
     - Fetch scripts for each source
     - Script to load portion of data into gpu, include offset
-    - 
 
 ## Developer Setup
 

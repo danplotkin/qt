@@ -20,17 +20,20 @@ logo_str = f'''
 '''
 
 info_string = '''
+
+A 1B parameter language model created by Daniel Plotkin, Jack Hanke, and Nicole Birova.
+
 Enter 'q' or 'quit' to exit chat window.
 
-**TODO add model card!
-
 '''
+
 
 os.system('clear')
 print(logo_str)
 print(info_string)
+# TODO load model, show load progress.
 
-user_prompt_string = f'  Talk to {bcolors.CYAN}q{bcolors.ENDC}{bcolors.BLUE}t{bcolors.ENDC}: '
+user_prompt_string = f'  Talk to {bcolors.CYAN}q{bcolors.ENDC}{bcolors.BLUE}T{bcolors.ENDC}: '
 
 while True:
     user_input = str(input(user_prompt_string))
