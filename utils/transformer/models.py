@@ -1,10 +1,11 @@
-from utils.transformer.layers import *
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
 from typing import Union, Literal
+
+from utils.transformer.layers import *
 
 
 class QT(nn.Module):
@@ -167,3 +168,18 @@ class QT(nn.Module):
         if return_tokens:
             return inference_tokens
         return self.tokenizer.decode(inference_tokens)
+    
+if __name__ == '__main__':
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    qt = QT(
+        tgt_vocab_size = , 
+        d_model = , 
+        num_heads = , 
+        num_layers = , 
+        d_ff = , 
+        max_seq_length = 1024, 
+        dropout = 0.1,
+        tokenizer = GPT2TokenizerFast,
+        device = device)

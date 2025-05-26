@@ -21,6 +21,7 @@ logo_str = f'''
 
 info_string = '''
 Enter 'q' or 'quit' to exit chat window.
+
 **TODO add model card!
 
 '''
@@ -43,4 +44,3 @@ while True:
     '''
 
     print(f"{bcolors.CYAN}{model_response:>12}{bcolors.ENDC}")
-
