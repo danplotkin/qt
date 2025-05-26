@@ -37,6 +37,7 @@ For instruction tuning:
 ## Project TODOs
 
 - Model design:
+    - Add smart weight init (word distribution init)
     - Change parameter precision to `fp32`
     - [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
     - Tie embeddings
