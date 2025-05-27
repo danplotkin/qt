@@ -31,6 +31,7 @@ class QT(nn.Module):
         self.positional_encoding = SinusoidalPositionalEncoding(d_model, max_seq_length)
         self.decoder_layers = nn.ModuleList([DecoderLayer(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)])
         self.fc = nn.Linear(d_model, tgt_vocab_size)
+        self.fc.weight = self.decoder_embedding.weight # NOTE tie weights
         self.dropout = nn.Dropout(dropout)
 
     def initialize_output_bias(self, token_sequences: Iterable[int]):
@@ -78,7 +79,9 @@ class QT(nn.Module):
     def forward(self, tgt: torch.Tensor) -> torch.Tensor:
         """Decoder-only transformer forward pass"""
         tgt_mask = self.generate_mask(tgt)
-        tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt)))
+        # tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt)))
+        # NOTE no positional encodings, using ALiBi 
+        tgt_embedded = self.dropout(self.decoder_embedding(tgt))
 
         dec_output = tgt_embedded
         for dec_layer in self.decoder_layers:

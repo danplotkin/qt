@@ -37,11 +37,11 @@ For instruction tuning:
 ## Project TODOs
 
 - Model design:
-    - Add smart weight init (word distribution init)
+    - ✅ Add smart weight init (word distribution init)
     - Change parameter precision to `fp32`
-    - [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
-    - Tie embeddings
-    - Architecture parameters: 
+    - ✅ [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
+    - ✅ Tie embeddings
+    - ✅ Architecture parameters: 
         - `tgt_vocab_size` = `50257`
         - `d_model` = `2048`
         - `d_ff` = `8192`

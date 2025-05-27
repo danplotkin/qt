@@ -55,7 +55,24 @@ class SinusoidalPositionalEncoding(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Add positional encodings to input tensor."""
         return x + self.pe[:, :x.size(1)]
-    
+
+
+
+def get_relative_positions(seq_len: int) -> torch.tensor:
+    x = torch.arange(seq_len)[None, :]
+    y = torch.arange(seq_len)[:, None]
+    return x - y
+
+
+def get_alibi_slope(num_heads):
+    x = (2 ** (8 / num_heads))
+    return (
+        torch.tensor([1 / x ** (i + 1) for i in range(num_heads)])
+        .unsqueeze(-1)
+        .unsqueeze(-1)
+    )
+
+
 
 class MultiHeadAttention(nn.Module):
     """Multi-head self-attention mechanism used in Transformer models."""
@@ -71,10 +88,17 @@ class MultiHeadAttention(nn.Module):
         self.W_k = nn.Linear(d_model, d_model)
         self.W_v = nn.Linear(d_model, d_model)
         self.W_o = nn.Linear(d_model, d_model)
-        
+
+        self.register_buffer("m", get_alibi_slope(self.num_heads))
+
     def scaled_dot_product_attention(self, Q: torch.Tensor, K: torch.Tensor, V: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """Compute attention output using scaled dot-product with optional masking."""
+        seq_len = Q.shape[1] # get sequence length fo ALiBi
         attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
+
+        # ALiBi
+        bias = (self.m * get_relative_positions(seq_len)).unsqueeze(0)
+        attn_scores += bias
         
         if mask is not None:
             attn_scores = attn_scores.masked_fill(mask == 0, -1e9)
