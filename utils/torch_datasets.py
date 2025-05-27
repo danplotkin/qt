@@ -20,4 +20,4 @@ class MiniPileDataset(Dataset):
         chunk = self.tokens[start : start + self.block_size + 1]
         input_tensor = chunk[:-1].clone().long()
         label_tensor = chunk[1:].clone().long()
-        return {"input_ids": input_tensor, "labels": label_tensor}
+        return input_tensor, label_tensor
