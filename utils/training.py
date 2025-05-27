@@ -7,11 +7,14 @@ from typing import Optional
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import numpy as np
+import logging
+from time import time
 
 from utils.configs import TrainingConfigs
 from utils.metrics import BaseMetric
 from utils.losses import BaseLoss
 
+logger = logging.getLogger(__name__)
 
 class EarlyStopping:
     """
@@ -98,7 +101,8 @@ class Trainer:
         """
         self.model.train()
         for epoch in range(1, self.config.epochs + 1):
-            print(f'Epoch {epoch}/{self.config.epochs}:')
+            ## training
+            train_start = time()
             epoch_loss = 0
             sum_acc = 0.0
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
@@ -113,7 +117,7 @@ class Trainer:
                 self.optimizer.step()
 
                 # TODO gradient clipping
-                # TODO fp32 stuff, casting?
+                # TODO fp32 stuff, casting or at init?
 
                 epoch_loss += loss.item()
 
@@ -122,10 +126,18 @@ class Trainer:
 
                 train_loss = epoch_loss / (i + 1)
                 train_acc = sum_acc / (i + 1)
-                pbar.set_description(f"Train {self.criterion.name}: {train_loss:.4f}, Train {self.metric.name}: {train_acc:.4f}")
+                # train batch logging
+                train_batch_str = f"Epoch {epoch}/{self.config.epochs} Batch {i} :: Train {self.criterion.name}: {train_loss:.4f}, Train {self.metric.name}: {train_acc:.4f}"
+                pbar.set_description(train_batch_str)
+                logging.debug(train_batch_str)
+            
             avg_loss = epoch_loss / len(self.train_loader)
             avg_accuracy = sum_acc / len(self.train_loader)
-            print()
+
+            ## train logging
+            train_str = f'Epoch {epoch}/{self.config.epochs} training done with loss: {avg_loss:.4f} in {time()-train_start:.2f} s.'
+            print(train_str)
+            logging.info(train_str)
 
             if self.val_loader is not None:
                 val_loss = self.evaluate()

@@ -1,14 +1,18 @@
+import numpy as np
+import collections
+import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
 from typing import Union, Literal, Iterable
-import numpy as np
-import collections
 
 from utils.transformer.layers import *
 from utils.configs import TransformerConfigs
+
+
+logger = logging.getLogger(__name__)
 
 class QT(nn.Module):
     def __init__(
@@ -57,8 +61,11 @@ class QT(nn.Module):
         log_p = np.log(p)
 
         entropy = -(log_p * p).sum()
-        print(f"\nUniform entropy: {np.log(vocab_size):0.2f}")
-        print(f"Marginal entropy: {entropy:0.2f}")
+
+        # logging
+        entropy_str = f"QT initialized with uniform entropy: {np.log(vocab_size):0.2f} and marginal entropy: {entropy:0.2f}"
+        print(entropy_str)
+        logger.info(entropy_str)
 
         log_p[counts_arr == 0] = -1e9
         self.fc.bias.data = torch.tensor(log_p, dtype=torch.float32, device=self.device)

@@ -37,8 +37,8 @@ For instruction tuning:
 ## Project TODOs
 
 - Model design:
-    - ✅ Add smart weight init (word distribution init)
     - Change parameter precision to `fp32`
+    - ✅ Add smart weight init (word distribution init)
     - ✅ [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
     - ✅ Tie embeddings
     - ✅ Architecture parameters: 
@@ -58,7 +58,8 @@ For instruction tuning:
 
 - Training:
     - Gradient clipping
-    - External logging
+    - Perplexity support for training (replace acc metric?)
+    - ✅ External logging
 - Data:
     - Decide how to best pull, tokenize, and save data
     - Fetch scripts for each source
@@ -73,3 +74,11 @@ source ./setup_env.sh
 ```
 
 Before writing any code, make sure your venv is activated, you have pulled changes, and all packages are installed.
+
+
+When training on a server that you plan to disconnect from, run:
+
+```bash
+./train.sh
+```
+

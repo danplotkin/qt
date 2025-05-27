@@ -9,13 +9,13 @@ training:
   early_stopping_min_delta: 0.001
   early_stopping_mode: "min"
   restore_best_model: true
-  logging_dir: "./pretraining.log"
+
 
 transformer:
-  tgt_vocab_size: 30522
-  d_model: 768
-  num_heads: 8
-  num_layers: 6
-  d_ff: 2048
-  max_seq_length: 512
+  tgt_vocab_size: 100
+  d_model: 100
+  num_heads: 2
+  num_layers: 1
+  d_ff: 10
+  max_seq_length: 100
   dropout: 0.1

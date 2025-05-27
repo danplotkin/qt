@@ -18,6 +18,8 @@ class TrainingConfigs:
     early_stopping_min_delta: float = 0.0
     early_stopping_mode: str = 'min'  # 'min' for loss, 'max' for accuracy
     restore_best_model: bool = True  # restore model weights from best epoch upon early stopping
+    #
+    logging_dir: str = './training.log'
 
     def __post_init__(self):
         if isinstance(self.learning_rate, str):

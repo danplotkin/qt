@@ -73,7 +73,6 @@ def get_alibi_slope(num_heads):
     )
 
 
-
 class MultiHeadAttention(nn.Module):
     """Multi-head self-attention mechanism used in Transformer models."""
     def __init__(self, d_model: int, num_heads: int) -> None:
@@ -98,6 +97,9 @@ class MultiHeadAttention(nn.Module):
 
         # ALiBi
         bias = (self.m * get_relative_positions(seq_len)).unsqueeze(0)
+        print(f'Q shape: {Q.shape}')
+        print(f'attn shape: {attn_scores.shape}')
+        print(f'bias shape: {bias.shape}')
         attn_scores += bias
         
         if mask is not None:
