@@ -4,6 +4,7 @@ This script loads, tokenizes, and saves tokenized data to disk for the minipile 
 
 import os
 import sys
+from time import time
 from typing import Union
 sys.path.append(os.getcwd())
 
@@ -43,4 +44,6 @@ def main():
 
 
 if __name__ == "__main__":
+    start = time()
     main()
+    print(f'Tokenized MiniPile in {(time()-start):.4f} s')

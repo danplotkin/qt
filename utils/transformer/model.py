@@ -28,7 +28,8 @@ class QT(nn.Module):
         self.device = device
         self.tokenizer = tokenizer
         self.decoder_embedding = nn.Embedding(tgt_vocab_size, d_model)
-        self.positional_encoding = SinusoidalPositionalEncoding(d_model, max_seq_length)
+        # NOTE no positional encodings
+        # self.positional_encoding = SinusoidalPositionalEncoding(d_model, max_seq_length)
         self.decoder_layers = nn.ModuleList([DecoderLayer(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)])
         self.fc = nn.Linear(d_model, tgt_vocab_size)
         self.fc.weight = self.decoder_embedding.weight # NOTE tie weights
