@@ -19,6 +19,12 @@ class TrainingConfigs:
     early_stopping_mode: str = 'min'  # 'min' for loss, 'max' for accuracy
     restore_best_model: bool = True  # restore model weights from best epoch upon early stopping
 
+    def __post_init__(self):
+        if isinstance(self.learning_rate, str):
+            self.learning_rate = eval(self.learning_rate)
+        if isinstance(self.weight_decay, str):
+            self.weight_decay = eval(self.weight_decay)
+
 
 @dataclass
 class TransformerConfigs:
