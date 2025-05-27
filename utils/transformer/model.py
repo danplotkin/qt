@@ -71,7 +71,7 @@ class QT(nn.Module):
 
     def generate_mask(self, tgt: torch.Tensor) -> torch.Tensor:
         """Generate casual and padding mask"""
-        tgt_mask = (tgt != 0).unsqueeze(1).unsqueeze(3)
+        tgt_mask = (tgt != self.tokenizer.pad_token_id).unsqueeze(1).unsqueeze(3)
         seq_length = tgt.size(1)
         nopeak_mask = (1 - torch.triu(torch.ones(1, seq_length, seq_length), diagonal=1)).bool().to(tgt.device)
         tgt_mask = tgt_mask & nopeak_mask
