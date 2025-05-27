@@ -6,34 +6,28 @@ from transformers import GPT2Tokenizer, GPT2TokenizerFast
 from typing import Union, Literal, Iterable
 import numpy as np
 import collections
-from tqdm import tqdm
 
 from utils.transformer.layers import *
-
+from utils.configs import TransformerConfigs
 
 class QT(nn.Module):
     def __init__(
         self, 
-        tgt_vocab_size: int, 
-        d_model: int, num_heads: int, 
-        num_layers: int, d_ff: int, 
-        max_seq_length: int, 
-        dropout: float,
+        config: TransformerConfigs,
         tokenizer: Union[GPT2Tokenizer, GPT2TokenizerFast],
         device: torch.device
     ) -> None:
         super(QT, self).__init__()
-        self.max_seq_length = max_seq_length
         self.to(device) # Put model on device on init
         self.device = device
         self.tokenizer = tokenizer
-        self.decoder_embedding = nn.Embedding(tgt_vocab_size, d_model)
+        self.decoder_embedding = nn.Embedding(config.tgt_vocab_size, config.d_model)
         # NOTE no positional encodings
         # self.positional_encoding = SinusoidalPositionalEncoding(d_model, max_seq_length)
-        self.decoder_layers = nn.ModuleList([DecoderLayer(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)])
-        self.fc = nn.Linear(d_model, tgt_vocab_size)
+        self.decoder_layers = nn.ModuleList([DecoderLayer(config.d_model, config.num_heads, config.d_ff, config.dropout) for _ in range(config.num_layers)])
+        self.fc = nn.Linear(config.d_model, config.tgt_vocab_size)
         self.fc.weight = self.decoder_embedding.weight # NOTE tie weights
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(config.dropout)
 
     def initialize_output_bias(self, token_sequences: Iterable[int]):
         """
