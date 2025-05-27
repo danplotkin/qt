@@ -8,7 +8,7 @@ import numpy as np
 import collections
 from tqdm import tqdm
 
-from utils.transformer.layers import *
+from utils.transformer.layers import DecoderLayer, SinusoidalPositionalEncoding
 
 
 class QT(nn.Module):
@@ -69,24 +69,27 @@ class QT(nn.Module):
         log_p[counts_arr == 0] = -1e9
         self.fc.bias.data = torch.tensor(log_p, dtype=torch.float32, device=self.device)
 
-    def generate_mask(self, tgt: torch.Tensor) -> torch.Tensor:
-        """Generate casual and padding mask"""
-        tgt_mask = (tgt != 0).unsqueeze(1).unsqueeze(3)
-        seq_length = tgt.size(1)
-        nopeak_mask = (1 - torch.triu(torch.ones(1, seq_length, seq_length), diagonal=1)).bool().to(tgt.device)
-        tgt_mask = tgt_mask & nopeak_mask
-        return tgt_mask
+    def generate_mask(self, tgt: torch.Tensor):
+        """
+        Returns:
+            attn_mask: Tensor of shape (seq_length, seq_length) where True blocks future tokens.
+            key_padding_mask: Tensor of shape (batch_size, seq_length) where True masks padding (token id == pad_token_id).
+        """
+        batch_size, seq_length = tgt.size()
+        key_padding_mask = (tgt == self.tokenizer.pad_token_id)
+        attn_mask = torch.triu(torch.ones(seq_length, seq_length, device=tgt.device), diagonal=1).bool()
+        return attn_mask, key_padding_mask
 
     def forward(self, tgt: torch.Tensor) -> torch.Tensor:
         """Decoder-only transformer forward pass"""
-        tgt_mask = self.generate_mask(tgt)
+        attn_mask, key_padding_mask = self.generate_mask(tgt)
         # tgt_embedded = self.dropout(self.positional_encoding(self.decoder_embedding(tgt)))
         # NOTE no positional encodings, using ALiBi 
         tgt_embedded = self.dropout(self.decoder_embedding(tgt))
 
         dec_output = tgt_embedded
         for dec_layer in self.decoder_layers:
-            dec_output = dec_layer(dec_output, tgt_mask)
+            dec_output = dec_layer(dec_output, attn_mask=attn_mask, key_padding_mask=key_padding_mask)
 
         output = self.fc(dec_output)
         return output
