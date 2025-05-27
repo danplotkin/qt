@@ -54,7 +54,7 @@ For instruction tuning:
         - `939k` non-embedding parameters
         - `103k` embedding parameters
 
-        Training with Adam for `fp32` params with take up atleast `24GBs`, and for inference the model will take up `5GBs`.
+        Training with AdamW for `fp32` params with take up atleast `24GBs`, and for inference the model will take up `5GBs`.
 
 - Training:
     - Gradient clipping

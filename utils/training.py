@@ -97,13 +97,13 @@ class Trainer:
         Logs average loss and accuracy per epoch.
         """
         self.model.train()
-        for epoch in range(1, self.config.num_epochs + 1):
-            print(f'Epoch {epoch}/{self.config.num_epochs}:')
+        for epoch in range(1, self.config.epochs + 1):
+            print(f'Epoch {epoch}/{self.config.epochs}:')
             epoch_loss = 0
             sum_acc = 0.0
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
             for i, (inputs, targets) in pbar:
-                # target is shaped (batch, seq_len)
+                # targets is shaped (batch, seq_len)
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
                 logits = self.model(inputs) # batch, seq_len, vocab_size
@@ -111,6 +111,9 @@ class Trainer:
                 loss = self.criterion(logits, targets)
                 loss.backward()
                 self.optimizer.step()
+
+                # TODO gradient clipping
+                # TODO fp32 stuff, casting?
 
                 epoch_loss += loss.item()
 
