@@ -2,10 +2,11 @@ import sys
 import os
 import unittest
 sys.path.append(os.getcwd())
-from utils.transformer.models import QT
+from utils.transformer.model import QT
 import torch
 import torch.nn as nn
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
+from utils.tokenizer import get_tokenizer
 
 
 class TestTransformerModel(unittest.TestCase):
@@ -19,7 +20,7 @@ class TestTransformerModel(unittest.TestCase):
             dropout=0.1,
             num_layers=1,
             d_ff=10,
-            tokenizer=GPT2TokenizerFast.from_pretrained('gpt2'),
+            tokenizer=get_tokenizer(),
             device='cpu'
         )
         dummy_input = torch.randint(0, 10, size=(1, 50))
