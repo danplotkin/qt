@@ -16,6 +16,7 @@ import boto3
 from logging.handlers import RotatingFileHandler
 import yaml
 from dataclasses import asdict
+import json
 
 from utils.configs import TrainingConfigs, TransformerConfigs
 from utils.metrics import BaseMetric
@@ -138,7 +139,7 @@ class Trainer:
                             dest = os.path.join(self.checkpoint_dir, os.path.basename(rel))
                         elif rel.startswith(f"{self.config.model_name}/logs") and rel.endswith('.log'):
                             dest = os.path.join(self.log_dir, os.path.basename(rel))
-                        elif rel == f"{self.config.model_name}/config.yaml" or rel.endswith('best_epoch.txt'):
+                        elif rel == f"{self.config.model_name}/config.yaml" or rel.endswith('best_epoch.json'):
                             dest = os.path.join(self.experiment_dir, os.path.basename(rel))
                         else:
                             continue
@@ -147,6 +148,22 @@ class Trainer:
                             self.s3_client.download_file(bucket, key, dest)
             except Exception as e:
                 logger.warning(f"Could not download existing artifacts from S3: {e}")
+        # Load history if exists
+        history_path = os.path.join(self.experiment_dir, "history.json")
+        s3_history_key = f"{self.config.s3_prefix}{self.config.model_name}/history.json"
+        # Attempt to download from S3
+        if self.s3_client:
+            try:
+                self.s3_client.download_file(bucket, s3_history_key, history_path)
+            except Exception:
+                pass
+        # Load local history if present
+        if os.path.exists(history_path):
+            try:
+                with open(history_path, "r") as hf:
+                    self.history = json.load(hf)
+            except Exception as e:
+                logger.warning(f"Could not load history.json: {e}")
         # Initialize early stopping if configured
         if self.config.early_stopping:
             self.early_stopping = EarlyStopping(
@@ -191,7 +208,13 @@ class Trainer:
         Logs average loss and accuracy per epoch.
         """
         self.model.train()
-        for epoch in range(1, self.config.epochs + 1):
+        # Determine starting epoch based on loaded history
+        last_epoch = len(self.history.get('train_loss', []))
+        start_epoch = last_epoch + 1
+        if start_epoch > self.config.epochs:
+            logger.info(f"All {last_epoch} epochs already completed. Nothing to train.")
+            return
+        for epoch in range(start_epoch, self.config.epochs + 1):
             # Configure logging for this epoch
             epoch_log_path = os.path.join(self.log_dir, f"epoch{epoch}.log")
             # Truncate existing log file so it doesn't append
@@ -261,16 +284,20 @@ class Trainer:
                 self.best_val_loss = val_loss
                 self._save_checkpoint(is_best=True)
                 # Write best epoch info
-                best_info = f"{epoch},{val_loss:.4f},{self.last_val_accuracy:.4f}"
-                best_info_path = os.path.join(self.experiment_dir, "best_epoch.txt")
+                best_info = {
+                    "epoch": epoch,
+                    "val_loss": val_loss,
+                    "val_accuracy": self.last_val_accuracy
+                }
+                best_info_path = os.path.join(self.experiment_dir, "best_epoch.json")
                 with open(best_info_path, "w") as f:
-                    f.write(best_info)
+                    json.dump(best_info, f, indent=2)
                 # Upload best epoch info file to S3
                 if self.s3_client:
                     self.s3_client.upload_file(
                         best_info_path,
                         self.config.s3_bucket,
-                        f"{self.config.s3_prefix}{self.config.model_name}/best_epoch.txt"
+                        f"{self.config.s3_prefix}{self.config.model_name}/best_epoch.json"
                     )
 
             # Check early stopping based on validation loss
@@ -285,6 +312,14 @@ class Trainer:
                     root_logger.removeHandler(handler)
                     handler.close()
                     break
+            # Save history to JSON
+            history_path = os.path.join(self.experiment_dir, "history.json")
+            with open(history_path, "w") as hf:
+                json.dump(self.history, hf, indent=2)
+            # Upload history to S3
+            if self.s3_client:
+                s3_history_key = f"{self.config.s3_prefix}{self.config.model_name}/history.json"
+                self.s3_client.upload_file(history_path, self.config.s3_bucket, s3_history_key)
             # Remove epoch log handler
             root_logger.removeHandler(handler)
             handler.close()

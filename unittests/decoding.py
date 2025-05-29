@@ -2,18 +2,14 @@ import sys
 import os
 import unittest
 sys.path.append(os.getcwd())
-from utils.transformer.models import QT
+from utils.transformer.model import QT
 import torch
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
+from utils.configs import load_configs
 
+config = load_configs(path='unittests/test_config.yaml')
 MODEL = QT(
-    tgt_vocab_size=100,
-    d_model=100,
-    num_heads=2,
-    max_seq_length=100,
-    dropout=0.1,
-    num_layers=1,
-    d_ff=10,
+    config=config['transformer'],
     tokenizer=GPT2TokenizerFast.from_pretrained('gpt2'),
     device='cpu'
 )
@@ -34,6 +30,18 @@ class TestDecodingMethods(unittest.TestCase):
     def test_beam(self):
         dummy_input = "."
         output = MODEL.decode(dummy_input, method='beam')
+        self.assertIsInstance(output, str)
+        self.assertGreater(len(output), 0)
+
+    def test_topk(self):
+        dummy_input = "."
+        output = MODEL.decode(dummy_input, method='topk', max_tokens=10)
+        self.assertIsInstance(output, str)
+        self.assertGreater(len(output), 0)
+
+    def test_topp(self):
+        dummy_input = "."
+        output = MODEL.decode(dummy_input, method='topp', max_tokens=10)
         self.assertIsInstance(output, str)
         self.assertGreater(len(output), 0)
 

@@ -1,7 +1,7 @@
 import yaml
 from dataclasses import dataclass
 from torch.optim import Optimizer, AdamW
-from typing import Optional
+from typing import Optional, Literal
 
 
 @dataclass
@@ -41,7 +41,7 @@ class TransformerConfigs:
     dropout: float = 0.1
 
 
-def load_configs(path: str = "config.yaml") -> dict[str, object]:
+def load_configs(path: str = "config.yaml") -> dict[Literal['transformer', 'training'], object]:
     """
     Load configuration values from a YAML file and return TrainingConfigs and TransformerConfigs instances.
     Expects the YAML structure:

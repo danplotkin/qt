@@ -73,7 +73,12 @@ class QT(nn.Module):
 
     def generate_mask(self, tgt: torch.Tensor) -> torch.Tensor:
         """Generate casual and padding mask"""
-        tgt_mask = (tgt != self.tokenizer.pad_token_id).unsqueeze(1).unsqueeze(3)
+        pad_id = self.tokenizer.pad_token_id
+        if pad_id is None:
+            padding = torch.ones_like(tgt, dtype=torch.bool, device=tgt.device)
+        else:
+            padding = tgt != pad_id
+        tgt_mask = padding.unsqueeze(1).unsqueeze(3)
         seq_length = tgt.size(1)
         nopeak_mask = (1 - torch.triu(torch.ones(1, seq_length, seq_length), diagonal=1)).bool().to(tgt.device)
         tgt_mask = tgt_mask & nopeak_mask
@@ -102,11 +107,12 @@ class QT(nn.Module):
     def decode(
         self,
         text: str,
-        method: Literal["greedy", "beam", "sample", "topk"] = "greedy",
+        method: Literal["greedy", "beam", "sample", "topk", "topp"] = "greedy",
         max_tokens: int = 100,
         return_tokens: bool = False,
         beam_size: int = 3,
-        tau: float = 1.0
+        tau: float = 1.0,
+        top_p: float = 0.9
     ) -> Union[str, list[int]]:
         """
         Decode text using specified decoding strategy.
@@ -130,6 +136,14 @@ class QT(nn.Module):
             return self._decode_topk(
                 text, max_tokens=max_tokens, return_tokens=return_tokens, k=beam_size
             )
+        elif method == "topp":
+            return self._decode_topp(
+                text,
+                max_tokens=max_tokens,
+                return_tokens=return_tokens,
+                p=top_p,
+                tau=tau
+            )
         else:
             raise ValueError(f"Unsupported decode method: {method}")
 
@@ -151,7 +165,7 @@ class QT(nn.Module):
 
             # Append next token to tgt
             tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
-            tgt = tgt[:, -self.max_seq_length:]  # context cuttoff
+            tgt = tgt[:, -self.config.max_seq_length:]  # context cuttoff
 
         if return_tokens:
             return inference_tokens
@@ -210,7 +224,7 @@ class QT(nn.Module):
 
             # Append next token to tgt
             tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
-            tgt = tgt[:, -self.max_seq_length:]  # context cuttoff
+            tgt = tgt[:, -self.config.max_seq_length:]  # context cuttoff
 
         if return_tokens:
             return inference_tokens
@@ -244,8 +258,55 @@ class QT(nn.Module):
 
             inference_tokens.append(next_token.item())
             tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
-            tgt = tgt[:, -self.max_seq_length:]
+            tgt = tgt[:, -self.config.max_seq_length:]
         
+        if return_tokens:
+            return inference_tokens
+        return self.tokenizer.decode(inference_tokens)
+
+    @torch.no_grad()
+    def _decode_topp(
+        self,
+        text: str,
+        max_tokens: int = 100,
+        return_tokens: bool = False,
+        p: float = 0.9,
+        tau: float = 1.0
+    ) -> Union[str, list[int]]:
+        """
+        Nucleus (top-p) sampling decoding: at each step, sample from the smallest set of tokens
+        whose cumulative probability mass exceeds p.
+        """
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device)
+        inference_tokens = []
+
+        for _ in range(max_tokens):
+            logits = self.forward(tgt=tgt)[:, -1, :] / tau
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+            probs = F.softmax(sorted_logits, dim=-1)
+            cumulative_probs = probs.cumsum(dim=-1)
+
+            # Identify tokens to remove
+            sorted_indices_to_remove = cumulative_probs > p
+            sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+            sorted_indices_to_remove[..., 0] = False
+
+            # Map back to original indices and mask
+            indices_to_remove = sorted_indices_to_remove.scatter(
+                1, sorted_indices, sorted_indices_to_remove
+            )
+            logits[indices_to_remove] = float('-inf')
+
+            dist = Categorical(logits=logits)
+            next_token = dist.sample()
+
+            if next_token.item() == self.tokenizer.eos_token_id:
+                break
+
+            inference_tokens.append(next_token.item())
+            tgt = torch.cat([tgt, next_token.unsqueeze(0)], dim=1)
+            tgt = tgt[:, -self.config.max_seq_length:]
+
         if return_tokens:
             return inference_tokens
         return self.tokenizer.decode(inference_tokens)

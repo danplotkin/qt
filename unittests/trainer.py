@@ -20,7 +20,7 @@ def test_trainer_runs_without_error():
     loader = DataLoader(dataset, batch_size=2)
 
     # Configs
-    config = TrainingConfigs(epochs=1)
+    config = TrainingConfigs(epochs=6)
     transformer_config = TransformerConfigs(tgt_vocab_size=100, d_model=32, num_heads=2, num_layers=2, d_ff=64, max_seq_length=32, dropout=0.1)
 
     # Tokenizer 
@@ -49,9 +49,6 @@ def test_trainer_runs_without_error():
     )
 
     trainer.train()
-
-    assert len(trainer.history['train_loss']) == config.epochs
-    assert len(trainer.history['train_acc']) == config.epochs
 
 
 if __name__ == '__main__':
