@@ -12,8 +12,8 @@ from tqdm import tqdm
 from utils.transformer.layers import *
 from utils.configs import TransformerConfigs
 
-
 logger = logging.getLogger(__name__)
+
 
 class QT(nn.Module):
     def __init__(
@@ -34,43 +34,6 @@ class QT(nn.Module):
         self.fc = nn.Linear(config.d_model, config.tgt_vocab_size)
         self.fc.weight = self.decoder_embedding.weight # NOTE tie weights
         self.dropout = nn.Dropout(config.dropout)
-
-    def initialize_output_bias(self, token_sequences: Iterable[int]):
-        """
-        Initializes the output layer's bias based on token frequency distribution.
-
-        Args:
-            token_sequences: An iterable of token IDs.
-        Notes:
-            All special tokens, as defined by self.tokenizer.all_special_ids, are excluded from frequency counts.
-        """
-        counts = collections.Counter(token_sequences)
-
-        vocab_size = self.decoder_embedding.num_embeddings
-        counts_arr = np.zeros(shape=(vocab_size,))
-        for idx, count in tqdm(counts.items(), desc="Accumulating token counts"):
-            if idx < vocab_size:
-                counts_arr[idx] = count
-
-        # Zero out counts for all special tokens defined by the tokenizer
-        for special_id in tqdm(self.tokenizer.all_special_ids, desc="Zeroing special tokens"):
-            if special_id < vocab_size:
-                counts_arr[special_id] = 0
-
-        total = counts_arr.sum()
-        p = counts_arr / total
-        p[counts_arr == 0] = 1.0
-        log_p = np.log(p)
-
-        entropy = -(log_p * p).sum()
-
-        # logging
-        entropy_str = f"QT initialized with uniform entropy: {np.log(vocab_size):0.2f} and marginal entropy: {entropy:0.2f}"
-        print(entropy_str)
-        logger.info(entropy_str)
-
-        log_p[counts_arr == 0] = -1e9
-        self.fc.bias.data = torch.tensor(log_p, dtype=torch.float32, device=self.device)
 
     def generate_mask(self, tgt: torch.Tensor) -> torch.Tensor:
         """Generate casual and padding mask"""

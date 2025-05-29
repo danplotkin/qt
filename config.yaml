@@ -14,7 +14,7 @@ training:
   # s3_prefix: "your/prefix/"
 
 transformer:
-  tgt_vocab_size: 30522
+  tgt_vocab_size: 50257
   d_model: 768
   num_heads: 8
   num_layers: 6

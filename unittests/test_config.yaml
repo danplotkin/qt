@@ -22,10 +22,10 @@ training:
 #   dropout: 0.1
 
 transformer:
-  tgt_vocab_size: 60522
+  tgt_vocab_size: 50257
   d_model: 768
   num_heads: 1
   num_layers: 1
   d_ff: 10
-  max_seq_length: 100
+  max_seq_length: 50
   dropout: 0.1

@@ -2,6 +2,7 @@ import yaml
 from dataclasses import dataclass
 from torch.optim import Optimizer, AdamW
 from typing import Optional, Literal
+from utils.tokenizer import get_tokenizer
 
 
 @dataclass
@@ -32,7 +33,7 @@ class TrainingConfigs:
 
 @dataclass
 class TransformerConfigs:
-    tgt_vocab_size: int = 50257
+    tgt_vocab_size: int = 5000
     d_model: int = 2048
     num_heads: int = 16
     num_layers: int = 14
