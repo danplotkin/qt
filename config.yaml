@@ -3,7 +3,7 @@ training:
   batch_size: 32
   epochs: 10
   weight_decay: 0.01
-  output_dir: "./checkpoints"
+  output_dir: "./experiments"
   early_stopping: true
   early_stopping_patience: 5
   early_stopping_min_delta: 0.001

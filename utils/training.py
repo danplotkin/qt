@@ -1,4 +1,5 @@
 import os
+import shutil
 import glob
 import re
 import copy
@@ -13,8 +14,10 @@ import logging
 from time import time
 import boto3
 from logging.handlers import RotatingFileHandler
+import yaml
+from dataclasses import asdict
 
-from utils.configs import TrainingConfigs
+from utils.configs import TrainingConfigs, TransformerConfigs
 from utils.metrics import BaseMetric
 from utils.losses import BaseLoss
 
@@ -64,6 +67,7 @@ class Trainer:
         train_loader (DataLoader): DataLoader for training data.
         val_loader (Optional[DataLoader]): DataLoader for validation data.
         config (TrainingConfigs): Training configuration parameters.
+        transformer_config: Transformer configuration parameters.
         criterion (nn.Module): Loss function.
         metric (callable): Function to compute accuracy or another evaluation metric.
         device (str): Device to run training on ('cuda' or 'cpu').
@@ -82,6 +86,7 @@ class Trainer:
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config
+        self.transformer_config = self.model.config
         self.device = device
         self.optimizer = config.optimizer(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
         self.criterion = criterion
@@ -97,12 +102,25 @@ class Trainer:
             self.s3_client = boto3.client('s3')
         else:
             self.s3_client = None
-        # Upload configuration file to S3
+        # Setup unified experiment directory structure
+        self.experiment_dir = os.path.join(self.config.output_dir, self.config.model_name)
+        self.checkpoint_dir = os.path.join(self.experiment_dir, "checkpoints")
+        self.log_dir = os.path.join(self.experiment_dir, "logs")
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        os.makedirs(self.log_dir, exist_ok=True)
+
+        # Save a plain-text summary of training config and transformer config
+        config_txt_path = os.path.join(self.experiment_dir, "config.txt")
+        with open(config_txt_path, "w") as f:
+            f.write("TrainingConfigs:\n")
+            for key, value in asdict(self.config).items():
+                f.write(f"{key}: {value}\n")
+            f.write("\nTransformerConfigs:\n")
+            for key, value in asdict(self.transformer_config).items():
+                f.write(f"{key}: {value}\n")
         if self.s3_client:
-            config_file_path = os.path.join(os.getcwd(), "configs.yaml")
-            if os.path.exists(config_file_path):
-                config_s3_key = f"{self.config.s3_prefix}configs.yaml"
-                self.s3_client.upload_file(config_file_path, self.config.s3_bucket, config_s3_key)
+            txt_s3_key = f"{self.config.s3_prefix}{self.config.model_name}/config.txt"
+            self.s3_client.upload_file(config_txt_path, self.config.s3_bucket, txt_s3_key)
 
         # Download existing artifacts from S3 to local dirs
         if self.s3_client:
@@ -115,18 +133,13 @@ class Trainer:
                 for page in pages:
                     for obj in page.get('Contents', []):
                         key = obj['Key']
-                        # Relative path after prefix
                         rel = key[len(prefix):] if key.startswith(prefix) else key
-                        # Determine local destination
-                        if rel.endswith('.pt'):
-                            os.makedirs(self.config.output_dir, exist_ok=True)
-                            dest = os.path.join(self.config.output_dir, os.path.basename(rel))
-                        elif rel.endswith('.log'):
-                            model_log_dir = os.path.join(self.config.logging_dir, self.config.model_name)
-                            os.makedirs(model_log_dir, exist_ok=True)
-                            dest = os.path.join(model_log_dir, os.path.basename(rel))
-                        elif rel in ('configs.yaml', 'best_epoch.txt'):
-                            dest = os.path.join(os.getcwd(), rel)
+                        if rel.startswith(f"{self.config.model_name}/checkpoints") and rel.endswith('.pt'):
+                            dest = os.path.join(self.checkpoint_dir, os.path.basename(rel))
+                        elif rel.startswith(f"{self.config.model_name}/logs") and rel.endswith('.log'):
+                            dest = os.path.join(self.log_dir, os.path.basename(rel))
+                        elif rel == f"{self.config.model_name}/config.yaml" or rel.endswith('best_epoch.txt'):
+                            dest = os.path.join(self.experiment_dir, os.path.basename(rel))
                         else:
                             continue
                         # Download only if not existing locally
@@ -149,13 +162,13 @@ class Trainer:
         try:
             output_dir = self.config.output_dir
             model_name = self.config.model_name
-            best_path = os.path.join(output_dir, f"{model_name}_best.pt")
+            best_path = os.path.join(output_dir, model_name, f"{model_name}_best.pt")
             if os.path.exists(best_path):
                 logger.info(f"Loading best model weights from {best_path}")
                 self.model.load_state_dict(torch.load(best_path, map_location=self.device))
             else:
                 # find epoch checkpoints
-                pattern = os.path.join(output_dir, f"{model_name}_epoch*.pt")
+                pattern = os.path.join(output_dir, model_name, f"{model_name}_epoch*.pt")
                 files = glob.glob(pattern)
                 if files:
                     # extract epoch numbers
@@ -180,10 +193,7 @@ class Trainer:
         self.model.train()
         for epoch in range(1, self.config.epochs + 1):
             # Configure logging for this epoch
-            os.makedirs(self.config.logging_dir, exist_ok=True) 
-            model_log_dir = os.path.join(self.config.logging_dir, self.config.model_name)
-            os.makedirs(model_log_dir, exist_ok=True)
-            epoch_log_path = os.path.join(model_log_dir, f"epoch{epoch}.log")
+            epoch_log_path = os.path.join(self.log_dir, f"epoch{epoch}.log")
             # Truncate existing log file so it doesn't append
             open(epoch_log_path, 'w').close()
             handler = RotatingFileHandler(epoch_log_path, mode='w', maxBytes=10_000_000, backupCount=5)
@@ -252,7 +262,7 @@ class Trainer:
                 self._save_checkpoint(is_best=True)
                 # Write best epoch info
                 best_info = f"{epoch},{val_loss:.4f},{self.last_val_accuracy:.4f}"
-                best_info_path = os.path.join(self.config.output_dir, "best_epoch.txt")
+                best_info_path = os.path.join(self.experiment_dir, "best_epoch.txt")
                 with open(best_info_path, "w") as f:
                     f.write(best_info)
                 # Upload best epoch info file to S3
@@ -260,7 +270,7 @@ class Trainer:
                     self.s3_client.upload_file(
                         best_info_path,
                         self.config.s3_bucket,
-                        f"{self.config.s3_prefix}best_epoch.txt"
+                        f"{self.config.s3_prefix}{self.config.model_name}/best_epoch.txt"
                     )
 
             # Check early stopping based on validation loss
@@ -313,18 +323,21 @@ class Trainer:
         return avg_loss
 
     def save_model(self) -> None:
-        os.makedirs(self.config.output_dir, exist_ok=True)
-        model_path = os.path.join(self.config.output_dir, f"{self.config.model_name}.pt")
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        model_path = os.path.join(self.checkpoint_dir, f"{self.config.model_name}.pt")
         torch.save(self.model.state_dict(), model_path)
         # Upload to S3 if configured
         if self.s3_client:
-            s3_key = f"{self.config.s3_prefix}{self.config.model_name}.pt"
+            s3_key = f"{self.config.s3_prefix}{self.config.model_name}/checkpoints/{self.config.model_name}.pt"
             self.s3_client.upload_file(model_path, self.config.s3_bucket, s3_key)
-            # Upload log file if it exists
-            log_path = self.config.logging_dir
-            if os.path.exists(log_path):
-                log_key = f"{self.config.s3_prefix}{os.path.basename(log_path)}"
-                self.s3_client.upload_file(log_path, self.config.s3_bucket, log_key)
+            # Upload log files if they exist
+            if os.path.exists(self.log_dir):
+                for fname in os.listdir(self.log_dir):
+                    self.s3_client.upload_file(
+                        os.path.join(self.log_dir, fname),
+                        self.config.s3_bucket,
+                        f"{self.config.s3_prefix}{self.config.model_name}/logs/{fname}"
+                    )
 
     def _save_checkpoint(self, epoch: Optional[int] = None, is_best: bool = False) -> None:
         """
@@ -332,21 +345,22 @@ class Trainer:
         If epoch is specified, saves as <model_name>_epoch{epoch}.pt.
         If is_best is True, saves as <model_name>_best.pt.
         """
-        os.makedirs(self.config.output_dir, exist_ok=True)
         suffix = "_best" if is_best else f"_epoch{epoch}"
-        checkpoint_path = os.path.join(
-            self.config.output_dir,
-            f"{self.config.model_name}{suffix}.pt"
-        )
+        checkpoint_path = os.path.join(self.checkpoint_dir, f"{self.config.model_name}{suffix}.pt")
         torch.save(self.model.state_dict(), checkpoint_path)
         if self.s3_client:
-            s3_key = f"{self.config.s3_prefix}{self.config.model_name}{suffix}.pt"
+            s3_key = f"{self.config.s3_prefix}{self.config.model_name}/checkpoints/{self.config.model_name}{suffix}.pt"
             self.s3_client.upload_file(checkpoint_path, self.config.s3_bucket, s3_key)
-            # Upload log file if it exists
-            log_path = self.config.logging_dir
+            # Upload log files if they exist
+            log_path = self.log_dir
             if os.path.exists(log_path):
-                log_key = f"{self.config.s3_prefix}{os.path.basename(log_path)}"
-                self.s3_client.upload_file(log_path, self.config.s3_bucket, log_key)
+                for fname in os.listdir(log_path):
+                    log_key = f"{self.config.s3_prefix}{self.config.model_name}/logs/{os.path.basename(fname)}"
+                    self.s3_client.upload_file(
+                        os.path.join(log_path, fname),
+                        self.config.s3_bucket,
+                        log_key
+                    )
 
     def plot_history(self) -> None:
         os.makedirs(self.config.output_dir, exist_ok=True)

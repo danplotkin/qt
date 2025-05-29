@@ -11,7 +11,7 @@ class TrainingConfigs:
     weight_decay: float = 0.01
     batch_size: int = 32
     epochs: int = 3
-    output_dir: str = "./checkpoints"
+    output_dir: str = "./experiments"
     s3_bucket: Optional[str] = None
     s3_prefix: str = ""
     optimizer: type[Optimizer] = AdamW

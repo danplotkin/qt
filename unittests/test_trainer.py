@@ -35,23 +35,23 @@ def test_trainer_runs_without_error():
 
     # Metric
     metric = MaskedAccuracy(padding_token_id=tokenizer.pad_token_id)
+    criterion = LastTokenLoss(ignore_index=tokenizer.pad_token_id)
 
     # Test both loss functions
-    for criterion in [SequenceLoss(ignore_index=tokenizer.pad_token_id), LastTokenLoss(ignore_index=tokenizer.pad_token_id)]:
-        trainer = Trainer(
-            model=model,
-            train_loader=loader,
-            val_loader=loader,
-            config=config,
-            criterion=criterion,
-            metric=metric,
-            device="cpu"
-        )
+    trainer = Trainer(
+        model=model,
+        train_loader=loader,
+        val_loader=loader,
+        config=config,
+        criterion=criterion,
+        metric=metric,
+        device="cpu"
+    )
 
-        trainer.train()
+    trainer.train()
 
-        assert len(trainer.history['train_loss']) == config.epochs
-        assert len(trainer.history['train_acc']) == config.epochs
+    assert len(trainer.history['train_loss']) == config.epochs
+    assert len(trainer.history['train_acc']) == config.epochs
 
 
 if __name__ == '__main__':

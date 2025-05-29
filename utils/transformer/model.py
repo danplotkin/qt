@@ -26,6 +26,7 @@ class QT(nn.Module):
         self.device = device
         self.tokenizer = tokenizer
         self.decoder_embedding = nn.Embedding(config.tgt_vocab_size, config.d_model)
+        self.config = config
         # NOTE no positional encodings
         # self.positional_encoding = SinusoidalPositionalEncoding(d_model, max_seq_length)
         self.decoder_layers = nn.ModuleList([DecoderLayer(config.d_model, config.num_heads, config.d_ff, config.dropout) for _ in range(config.num_layers)])
