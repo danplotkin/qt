@@ -68,7 +68,6 @@ class Trainer:
         train_loader (DataLoader): DataLoader for training data.
         val_loader (Optional[DataLoader]): DataLoader for validation data.
         config (TrainingConfigs): Training configuration parameters.
-        transformer_config: Transformer configuration parameters.
         criterion (nn.Module): Loss function.
         metric (callable): Function to compute accuracy or another evaluation metric.
         device (str): Device to run training on ('cuda' or 'cpu').
