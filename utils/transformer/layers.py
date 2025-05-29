@@ -95,11 +95,10 @@ class MultiHeadAttention(nn.Module):
         seq_len = Q.shape[1] # get sequence length fo ALiBi
         attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.d_k)
 
-        # ALiBi
-        bias = (self.m * get_relative_positions(seq_len)).unsqueeze(0)
-        print(f'Q shape: {Q.shape}')
-        print(f'attn shape: {attn_scores.shape}')
-        print(f'bias shape: {bias.shape}')
+        # ALiBi bias based on sequence length
+        seq_len = Q.size(-2)
+        rel = get_relative_positions(seq_len).to(Q.device)
+        bias = self.m.unsqueeze(0) * rel  # shape [1, heads, seq_len, seq_len]
         attn_scores += bias
         
         if mask is not None:

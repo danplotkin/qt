@@ -9,7 +9,9 @@ training:
   early_stopping_min_delta: 0.001
   early_stopping_mode: "min"
   restore_best_model: true
-  logging_dir: "./pretraining.log"
+  logging_dir: "./logs"
+  # s3_bucket: "your-bucket-name"
+  # s3_prefix: "your/prefix/"
 
 transformer:
   tgt_vocab_size: 30522

@@ -1,6 +1,7 @@
 import yaml
 from dataclasses import dataclass
 from torch.optim import Optimizer, AdamW
+from typing import Optional
 
 
 @dataclass
@@ -11,6 +12,8 @@ class TrainingConfigs:
     batch_size: int = 32
     epochs: int = 3
     output_dir: str = "./checkpoints"
+    s3_bucket: Optional[str] = None
+    s3_prefix: str = ""
     optimizer: type[Optimizer] = AdamW
     # Early stopping configurations
     early_stopping: bool = False
@@ -18,8 +21,7 @@ class TrainingConfigs:
     early_stopping_min_delta: float = 0.0
     early_stopping_mode: str = 'min'  # 'min' for loss, 'max' for accuracy
     restore_best_model: bool = True  # restore model weights from best epoch upon early stopping
-    #
-    logging_dir: str = './training.log'
+    logging_dir: str = "./logs"
 
     def __post_init__(self):
         if isinstance(self.learning_rate, str):

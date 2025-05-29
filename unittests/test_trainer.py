@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from utils.configs import TrainingConfigs, TransformerConfigs
-from utils.transformer.models import QT
+from utils.transformer.model import QT
 from utils.metrics import MaskedAccuracy
 from utils.training import Trainer
 from utils.tokenizer import get_tokenizer
@@ -20,7 +20,7 @@ def test_trainer_runs_without_error():
     loader = DataLoader(dataset, batch_size=2)
 
     # Configs
-    config = TrainingConfigs(num_epochs=1)
+    config = TrainingConfigs(epochs=1)
     transformer_config = TransformerConfigs(tgt_vocab_size=100, d_model=32, num_heads=2, num_layers=2, d_ff=64, max_seq_length=32, dropout=0.1)
 
     # Tokenizer 
@@ -28,13 +28,7 @@ def test_trainer_runs_without_error():
 
     # Model
     model = QT(
-        tgt_vocab_size=transformer_config.tgt_vocab_size,
-        d_model=transformer_config.d_model,
-        num_heads=transformer_config.num_heads,
-        num_layers=transformer_config.num_layers,
-        d_ff=transformer_config.d_ff,
-        max_seq_length=transformer_config.max_seq_length,
-        dropout=transformer_config.dropout,
+        config = transformer_config,
         tokenizer=tokenizer,
         device=torch.device("cpu")
     )
@@ -56,8 +50,8 @@ def test_trainer_runs_without_error():
 
         trainer.train()
 
-        assert len(trainer.history['train_loss']) == config.num_epochs
-        assert len(trainer.history['train_acc']) == config.num_epochs
+        assert len(trainer.history['train_loss']) == config.epochs
+        assert len(trainer.history['train_acc']) == config.epochs
 
 
 if __name__ == '__main__':
