@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch.distributions import Categorical
 from transformers import GPT2Tokenizer, GPT2TokenizerFast
 from typing import Union, Literal, Iterable
+from tqdm import tqdm
 
 from utils.transformer.layers import *
 from utils.configs import TransformerConfigs
@@ -47,12 +48,12 @@ class QT(nn.Module):
 
         vocab_size = self.decoder_embedding.num_embeddings
         counts_arr = np.zeros(shape=(vocab_size,))
-        for idx, count in counts.items():
+        for idx, count in tqdm(counts.items(), desc="Accumulating token counts"):
             if idx < vocab_size:
                 counts_arr[idx] = count
 
         # Zero out counts for all special tokens defined by the tokenizer
-        for special_id in self.tokenizer.all_special_ids:
+        for special_id in tqdm(self.tokenizer.all_special_ids, desc="Zeroing special tokens"):
             if special_id < vocab_size:
                 counts_arr[special_id] = 0
 
