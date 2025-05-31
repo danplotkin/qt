@@ -11,7 +11,7 @@ from utils.configs import load_configs, TrainingConfigs, TransformerConfigs
 from utils.training import Trainer
 from utils.transformer.model import QT
 from utils.losses import LastTokenLoss, SequenceLoss
-from utils.metrics import MaskedAccuracy
+from utils.metrics import MaskedAccuracy, Perplexity
 from utils.tokenizer import get_tokenizer
 from utils.torch_datasets import MiniPileDataset
 
@@ -64,7 +64,7 @@ def configure_trainer(init_bias: bool = False) -> Trainer:
         val_loader=val_loader,
         config=training_configs,
         criterion=SequenceLoss(ignore_index=tokenizer.pad_token_id),
-        metric=MaskedAccuracy(padding_token_id=tokenizer.pad_token_id)
+        metric=Perplexity(padding_token_id=tokenizer.pad_token_id)
     )
     return trainer
 
