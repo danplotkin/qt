@@ -5,6 +5,11 @@ from tqdm import tqdm
 from typing import Literal
 import os
 from utils.tokenizer import get_tokenizer
+#
+# Define subreddit file lists for train/val/test splits
+REDDIT_TRAIN_FILES = ['bestof.pt', 'bodyweightfitness.pt', 'buildapc.pt', 'explainlikeimfive.pt']
+REDDIT_VAL_FILES = ['tifu.pt']
+REDDIT_TEST_FILES = ['WritingPrompts.pt']
 
 
 class MiniPileDataset(Dataset):
@@ -26,7 +31,58 @@ class MiniPileDataset(Dataset):
         return input_tensor, label_tensor
     
 
+class RedditCommentsDataset(Dataset):
+    def __init__(self, split: Literal['train', 'val', 'test'], block_size: int, stride: int = None, dir: str = 'data/flattened_corpa/reddit_comments'):
+        self.block_size = block_size
+        self.stride = stride if stride is not None else block_size
+        self.dir = dir
+
+        if split == 'train':
+            self.files = REDDIT_TRAIN_FILES
+        elif split == 'val':
+            self.files = REDDIT_VAL_FILES
+        elif split == 'test':
+            self.files = REDDIT_TEST_FILES
+        else:
+            raise ValueError(f"Invalid split: {split}")
+
+        self.file_lengths = []
+        self.file_offsets = []
+        self.total_chunks = 0
+
+        # Precompute index ranges per file
+        for file in tqdm(self.files, desc=f"Indexing {split} split"):
+            path = os.path.join(dir, file)
+            length = len(torch.load(path))  # Load just to count
+            num_chunks = max(0, (length - block_size) // self.stride)
+            self.file_lengths.append(num_chunks)
+            self.file_offsets.append(self.total_chunks)
+            self.total_chunks += num_chunks
+
+    def __len__(self):
+        return self.total_chunks
+
+    def __getitem__(self, idx):
+        # Determine which file the idx belongs to
+        for i, offset in enumerate(self.file_offsets):
+            if idx < offset + self.file_lengths[i]:
+                file_index = i
+                local_idx = idx - offset
+                break
+        else:
+            raise IndexError(f"Index {idx} out of range")
+
+        path = os.path.join(self.dir, self.files[file_index])
+        tokens = torch.load(path)
+        start = local_idx * self.stride
+        chunk = tokens[start : start + self.block_size + 1]
+        input_tensor = chunk[:-1].clone().long()
+        label_tensor = chunk[1:].clone().long()
+        return input_tensor, label_tensor
+    
+
 class ExampleCorpusDataset(Dataset):
+    """This is just for unittesting"""
     def __init__(self, split: Literal['train', 'val'], block_size: int, stride: int = None):
         with open('unittests/corpus.txt') as f:
             self.corpus = f.read()
