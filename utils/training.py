@@ -180,18 +180,21 @@ class Trainer:
         # Track best validation loss for uploading best model
         self.best_val_loss = float('inf')
         # Load existing weights: prefer best, else latest epoch checkpoint
-        output_dir = self.checkpoint_dir
+        checkpoint_dir = self.checkpoint_dir
         model_name = self.config.model_name
-        print(f"[INFO] Checking for existing model checkpoints in {output_dir}/{model_name}")
+        print(f"[INFO] Checking for existing model checkpoints in {checkpoint_dir}")
         try:
-            best_path = os.path.join(output_dir, model_name, f"{model_name}_best.pt")
+            best_path = os.path.join(checkpoint_dir, f"{model_name}_best.pt")
             if os.path.exists(best_path):
                 print(f"[INFO] Found best model file at {best_path}. Loading best weights.")
                 logger.info(f"Loading best model weights from {best_path}")
-                self.model.load_state_dict(torch.load(best_path, map_location=self.device))
+                checkpoint = torch.load(best_path, map_location=self.device)
+                self.model.load_state_dict(checkpoint['model_state_dict'])
+                if 'optimizer_state_dict' in checkpoint:
+                    self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             else:
                 # find epoch checkpoints
-                pattern = os.path.join(output_dir, model_name, f"{model_name}_epoch*.pt")
+                pattern = os.path.join(checkpoint_dir, f"{model_name}_epoch*.pt")
                 files = glob.glob(pattern)
                 if files:
                     # extract epoch numbers
@@ -204,7 +207,10 @@ class Trainer:
                         latest = max(epochs, key=lambda x: x[0])[1]
                         print(f"[INFO] No best model found. Found latest checkpoint at {latest}. Loading latest weights.")
                         logger.info(f"Loading latest checkpoint weights from {latest}")
-                        self.model.load_state_dict(torch.load(latest, map_location=self.device))
+                        checkpoint = torch.load(latest, map_location=self.device)
+                        self.model.load_state_dict(checkpoint['model_state_dict'])
+                        if 'optimizer_state_dict' in checkpoint:
+                            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                     else:
                         print("[INFO] No existing checkpoints found. Initializing model with random weights.")
                 else:
@@ -427,7 +433,10 @@ class Trainer:
         """
         suffix = "_best" if is_best else f"_epoch{epoch}"
         checkpoint_path = os.path.join(self.checkpoint_dir, f"{self.config.model_name}{suffix}.pt")
-        torch.save(self.model.state_dict(), checkpoint_path)
+        torch.save({
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict()
+        }, checkpoint_path)
         if self.s3_client:
             s3_key = f"{self.config.s3_prefix}{self.config.model_name}/checkpoints/{self.config.model_name}{suffix}.pt"
             self.s3_client.upload_file(checkpoint_path, self.config.s3_bucket, s3_key)

@@ -4,6 +4,7 @@ sys.path.append(os.getcwd())
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from utils.torch_datasets import ExampleCorpusDataset
 from utils.configs import TrainingConfigs, TransformerConfigs
 from utils.transformer.model import QT
 from utils.metrics import MaskedAccuracy
@@ -12,23 +13,23 @@ from utils.tokenizer import get_tokenizer
 from utils.losses import SequenceLoss, LastTokenLoss
 import time
 import shutil
+import copy
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 def test_trainer_runs_without_error():
     # Create dummy data
-    input_ids = torch.randint(0, 100, (8, 32))  # batch_size=8, seq_len=32
-    target_ids = input_ids.clone()
-    dataset = TensorDataset(input_ids, target_ids)
+    # Tokenizer 
+    tokenizer = get_tokenizer()
+    dataset = ExampleCorpusDataset(20, 1)
     loader = DataLoader(dataset, batch_size=2)
 
     # Configs
-    config = TrainingConfigs(epochs=15)
-    transformer_config = TransformerConfigs(tgt_vocab_size=100, d_model=32, num_heads=2, num_layers=2, d_ff=64, max_seq_length=32, dropout=0.1)
+    config = TrainingConfigs(epochs=15, model_name='unittest')
+    transformer_config = TransformerConfigs(tgt_vocab_size=50_000, d_model=32, num_heads=2, num_layers=2, d_ff=64, max_seq_length=32, dropout=0.1)
 
-    shutil.rmtree(config.output_dir)
-
-    # Tokenizer 
-    tokenizer = get_tokenizer()
+    shutil.rmtree(config.output_dir, ignore_errors=True)
 
     # Model
     model = QT(
@@ -58,8 +59,13 @@ def test_trainer_runs_without_error():
     time.sleep(2)
 
     config.epochs = 30
+    model_reloaded = QT(
+        config=transformer_config,
+        tokenizer=tokenizer,
+        device=torch.device("cpu")
+    )
     trainer = Trainer(
-        model=model,
+        model=model_reloaded,
         train_loader=loader,
         val_loader=loader,
         config=config,
@@ -67,6 +73,8 @@ def test_trainer_runs_without_error():
         metric=metric,
         device="cpu"
     )
+
+    trainer.train()
 
 
 if __name__ == '__main__':

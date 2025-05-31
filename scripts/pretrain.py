@@ -50,8 +50,8 @@ def configure_trainer(init_bias: bool = False) -> Trainer:
     training_configs: TrainingConfigs = configs['training']
     transformer_configs: TransformerConfigs = configs['transformer']
     model = QT(config=transformer_configs, tokenizer=tokenizer, device='cpu')
-    train_ds = MiniPileDataset(path='data/flattened_corpa/minipile/train.pt', block_size=transformer_configs.max_seq_length)
-    val_ds = MiniPileDataset(path='data/flattened_corpa/minipile/validation.pt', block_size=transformer_configs.max_seq_length)
+    train_ds = MiniPileDataset(split='train', block_size=transformer_configs.max_seq_length)
+    val_ds = MiniPileDataset(split='validation', block_size=transformer_configs.max_seq_length)
     train_loader = DataLoader(train_ds, batch_size=training_configs.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=training_configs.batch_size, shuffle=False)
 
