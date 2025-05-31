@@ -27,11 +27,19 @@ class MiniPileDataset(Dataset):
     
 
 class ExampleCorpusDataset(Dataset):
-    def __init__(self, block_size: int, stride: int = None):
+    def __init__(self, split: Literal['train', 'val'], block_size: int, stride: int = None):
         with open('unittests/corpus.txt') as f:
             self.corpus = f.read()
         self.tokenizer = get_tokenizer()
         tokens = self.tokenizer.encode(self.corpus)
+        total_tokens = len(tokens)
+        train_end = int(0.8 * total_tokens)
+
+        if split == 'train':
+            tokens = tokens[:train_end]
+        elif split == 'val':
+            tokens = tokens[train_end:]
+
         self.block_size = block_size
         self.stride = stride if stride is not None else block_size
         self.tokens = torch.tensor(tokens, dtype=torch.long)

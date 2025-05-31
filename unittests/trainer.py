@@ -22,8 +22,10 @@ def test_trainer_runs_without_error():
     # Create dummy data
     # Tokenizer 
     tokenizer = get_tokenizer()
-    dataset = ExampleCorpusDataset(20, 1)
-    loader = DataLoader(dataset, batch_size=2)
+    train_dataset = ExampleCorpusDataset(split='train', block_size=20, stride=1)
+    val_dataset = ExampleCorpusDataset(split='val', block_size=20, stride=1)
+    train_loader = DataLoader(train_dataset, batch_size=2)
+    val_loader = DataLoader(val_dataset, batch_size=2)
 
     # Configs
     config = TrainingConfigs(epochs=15, model_name='unittest')
@@ -45,8 +47,8 @@ def test_trainer_runs_without_error():
     # Test both loss functions
     trainer = Trainer(
         model=model,
-        train_loader=loader,
-        val_loader=loader,
+        train_loader=train_loader,
+        val_loader=val_loader,
         config=config,
         criterion=criterion,
         metric=metric,
@@ -66,8 +68,8 @@ def test_trainer_runs_without_error():
     )
     trainer = Trainer(
         model=model_reloaded,
-        train_loader=loader,
-        val_loader=loader,
+        train_loader=train_loader,
+        val_loader=val_loader,
         config=config,
         criterion=criterion,
         metric=metric,
