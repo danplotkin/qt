@@ -1,3 +1,4 @@
+from torch.utils.data import ConcatDataset
 import torch
 from torch.utils.data import Dataset
 from datasets import Dataset as HFDataset
@@ -12,13 +13,13 @@ REDDIT_VAL_FILES = ['tifu.pt']
 REDDIT_TEST_FILES = ['WritingPrompts.pt']
 
 
+
 class MiniPileDataset(Dataset):
-    def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None, offset: int = 0, dir: str = 'data/flattened_corpa/minipile'):
+    def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None, dir: str = 'data/flattened_corpa/minipile'):
         self.tokens = torch.load(os.path.join(dir, split + '.pt'))
-        self.offset = offset
         self.block_size = block_size
         self.stride = stride if stride is not None else block_size
-        self.indices = list(range(0 + offset, len(self.tokens) - block_size, self.stride))
+        self.indices = list(range(0, len(self.tokens) - block_size, self.stride))
 
     def __len__(self):
         return len(self.indices)
@@ -110,3 +111,18 @@ class ExampleCorpusDataset(Dataset):
         input_tensor = chunk[:-1].clone().long()
         label_tensor = chunk[1:].clone().long()
         return input_tensor, label_tensor
+    
+    
+class PretrainedCorpaDataset(Dataset):
+    def __init__(self, split: Literal['train', 'val', 'test'], block_size: int, stride: int = None):
+        # Reddit uses 'val', MiniPile uses 'validation'
+        reddit_dataset = RedditCommentsDataset(split=split, block_size=block_size, stride=stride)
+        minipile_split = 'validation' if split == 'val' else split
+        minipile_dataset = MiniPileDataset(split=minipile_split, block_size=block_size, stride=stride)
+        self.dataset = ConcatDataset([reddit_dataset, minipile_dataset])
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
