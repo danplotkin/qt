@@ -18,10 +18,6 @@ def tokenize_and_flatten_stream(tokenizer, subreddit_name):
     label = subreddit_name
     output_path = os.path.join(FLATTENED_CORPA_DIR, f"{label}.pt")
 
-    if os.path.exists(output_path):
-        logger.info(f"Already exists: {output_path}. Skipping.")
-        return
-
     logger.info(f"Streaming and tokenizing: {label}")
     dataset = load_dataset("HuggingFaceGECLM/REDDIT_comments", split=subreddit_name, streaming=True)
 
@@ -37,9 +33,13 @@ def tokenize_and_flatten_stream(tokenizer, subreddit_name):
 
 def main():
     tokenizer = get_tokenizer()
-    subreddits = ["bestof", "bodyweightfitness", "buildapc"]
+    subreddits = ["bestof", "bodyweightfitness", "buildapc", "tifu", "explainlikeimfive", "WritingPrompts"]
 
     for subreddit in subreddits:
+        output_path = os.path.join(FLATTENED_CORPA_DIR, f"{subreddit}.pt")
+        if os.path.exists(output_path):
+            logger.info(f"Already tokenized: {output_path}. Skipping.")
+            continue
         tokenize_and_flatten_stream(tokenizer, subreddit)
 
 
