@@ -10,6 +10,8 @@ from utils.metrics import MaskedAccuracy
 from utils.training import Trainer
 from utils.tokenizer import get_tokenizer
 from utils.losses import SequenceLoss, LastTokenLoss
+import time
+import shutil
 
 
 def test_trainer_runs_without_error():
@@ -20,8 +22,10 @@ def test_trainer_runs_without_error():
     loader = DataLoader(dataset, batch_size=2)
 
     # Configs
-    config = TrainingConfigs(epochs=6)
+    config = TrainingConfigs(epochs=15)
     transformer_config = TransformerConfigs(tgt_vocab_size=100, d_model=32, num_heads=2, num_layers=2, d_ff=64, max_seq_length=32, dropout=0.1)
+
+    shutil.rmtree(config.output_dir)
 
     # Tokenizer 
     tokenizer = get_tokenizer()
@@ -49,6 +53,20 @@ def test_trainer_runs_without_error():
     )
 
     trainer.train()
+
+    print('\n\nSimilating stop....', '\n\n')
+    time.sleep(2)
+
+    config.epochs = 30
+    trainer = Trainer(
+        model=model,
+        train_loader=loader,
+        val_loader=loader,
+        config=config,
+        criterion=criterion,
+        metric=metric,
+        device="cpu"
+    )
 
 
 if __name__ == '__main__':

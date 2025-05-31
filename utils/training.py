@@ -20,6 +20,7 @@ import json
 
 from utils.configs import TrainingConfigs, TransformerConfigs
 from utils.metrics import BaseMetric
+from torchmetrics.text.perplexity import Perplexity as PerplexityMetric
 from utils.losses import BaseLoss
 
 
@@ -91,11 +92,15 @@ class Trainer:
         self.optimizer = config.optimizer(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
         self.criterion = criterion
         self.metric = metric
+        pad_id = getattr(metric, "padding_token_id")
+        self.perplexity = PerplexityMetric(ignore_index=pad_id)
         self.history = {
             'train_loss': [],
             'val_loss': [],
-            'train_acc': [],
-            'val_acc': []
+            'train_metric': [],
+            'val_metric': [],
+            'train_perplexity': [],
+            'val_perplexity': []
         }
         # Initialize S3 client if bucket is specified
         if self.config.s3_bucket:
@@ -175,11 +180,13 @@ class Trainer:
         # Track best validation loss for uploading best model
         self.best_val_loss = float('inf')
         # Load existing weights: prefer best, else latest epoch checkpoint
+        output_dir = self.checkpoint_dir
+        model_name = self.config.model_name
+        print(f"[INFO] Checking for existing model checkpoints in {output_dir}/{model_name}")
         try:
-            output_dir = self.config.output_dir
-            model_name = self.config.model_name
             best_path = os.path.join(output_dir, model_name, f"{model_name}_best.pt")
             if os.path.exists(best_path):
+                print(f"[INFO] Found best model file at {best_path}. Loading best weights.")
                 logger.info(f"Loading best model weights from {best_path}")
                 self.model.load_state_dict(torch.load(best_path, map_location=self.device))
             else:
@@ -195,8 +202,13 @@ class Trainer:
                     ]
                     if epochs:
                         latest = max(epochs, key=lambda x: x[0])[1]
+                        print(f"[INFO] No best model found. Found latest checkpoint at {latest}. Loading latest weights.")
                         logger.info(f"Loading latest checkpoint weights from {latest}")
                         self.model.load_state_dict(torch.load(latest, map_location=self.device))
+                    else:
+                        print("[INFO] No existing checkpoints found. Initializing model with random weights.")
+                else:
+                    print("[INFO] No existing checkpoints found. Initializing model with random weights.")
         except Exception as e:
             logger.warning(f"Could not load existing weights: {e}")
 
@@ -229,8 +241,10 @@ class Trainer:
             ## training
             train_start = time()
             epoch_loss = 0
-            sum_acc = 0.0
-            pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader))
+            sum_metric = 0.0
+            # Reset perplexity metric at the start of the epoch
+            self.perplexity.reset()
+            pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader), leave=False)
             for i, (inputs, targets) in pbar:
                 # targets is shaped (batch, seq_len)
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
@@ -242,39 +256,62 @@ class Trainer:
 
                 # Backward pass
                 loss.backward()
+                # Gradient clipping to prevent exploding gradients
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 self.optimizer.step()
 
-                # TODO gradient clipping
                 # TODO fp32 stuff, casting or at init?
 
                 epoch_loss += loss.item()
-
-                batch_acc = self.metric(logits, targets)
-                sum_acc += batch_acc.item()
+                
+                batch_metric = self.metric(logits, targets)
+                sum_metric += batch_metric
+                # Update perplexity metric with current batch
+                self.perplexity.update(logits, targets)
 
                 train_loss = epoch_loss / (i + 1)
-                train_acc = sum_acc / (i + 1)
+                train_metric = sum_metric / (i + 1)
                 # train batch logging
-                train_batch_str = f"Epoch {epoch}/{self.config.epochs} Batch {i} :: Train {self.criterion.name}: {train_loss:.4f}, Train {self.metric.name}: {train_acc:.4f}"
+                train_batch_str = f"Epoch {epoch}/{self.config.epochs} Batch {i} :: Train {self.criterion.name}: {train_loss:.4f}, Train {self.metric.name}: {train_metric:.4f}"
                 pbar.set_description(train_batch_str)
                 logging.debug(train_batch_str)
             
             avg_loss = epoch_loss / len(self.train_loader)
-            avg_accuracy = sum_acc / len(self.train_loader)
+            avg_metric = sum_metric / len(self.train_loader)
+            avg_metric = float(avg_metric)
+            avg_perplexity = self.perplexity.compute().item()
 
             ## train logging
-            train_str = f'Epoch {epoch}/{self.config.epochs} training done with loss: {avg_loss:.4f} in {time()-train_start:.2f} s.'
+            train_str = (
+                f"Epoch {epoch}/{self.config.epochs} TRAINING - "
+                f"Loss: {avg_loss:.4f}, "
+                f"{self.metric.name.capitalize()}: {avg_metric:.4f}, "
+                f"Perplexity: {avg_perplexity:.4f} "
+                f"in {time() - train_start:.2f} s."
+            )
             print(train_str)
             logging.info(train_str)
 
             # Validation
             if self.val_loader is not None:
-                val_loss = self.evaluate()
+                val_loss, val_metric, val_perplexity = self.evaluate()
+                val_metric = float(val_metric)
                 self.history['val_loss'].append(val_loss)
-                self.history['val_acc'].append(self.last_val_accuracy)
+                self.history['val_metric'].append(val_metric)
+                self.history['val_perplexity'].append(val_perplexity)
+                # Log validation results
+                val_str = (
+                    f"Epoch {epoch}/{self.config.epochs} VALIDATION - "
+                    f"Loss: {val_loss:.4f}, "
+                    f"{self.metric.name.capitalize()}: {val_metric:.4f}, "
+                    f"Perplexity: {val_perplexity:.4f}"
+                )
+                print(val_str)
+                logging.info(val_str)
 
             self.history['train_loss'].append(avg_loss)
-            self.history['train_acc'].append(avg_accuracy)
+            self.history['train_metric'].append(avg_metric)
+            self.history['train_perplexity'].append(avg_perplexity)
 
             # Save checkpoint and upload
             self._save_checkpoint(epoch=epoch)
@@ -286,7 +323,8 @@ class Trainer:
                 best_info = {
                     "epoch": epoch,
                     "val_loss": val_loss,
-                    "val_accuracy": self.last_val_accuracy
+                    "val_metric": val_metric,
+                    "val_perplexity": val_perplexity
                 }
                 best_info_path = os.path.join(self.experiment_dir, "best_epoch.json")
                 with open(best_info_path, "w") as f:
@@ -298,6 +336,7 @@ class Trainer:
                         self.config.s3_bucket,
                         f"{self.config.s3_prefix}{self.config.model_name}/best_epoch.json"
                     )
+                print('*'*50)
 
             # Check early stopping based on validation loss
             if self.early_stopping is not None and self.val_loader is not None:
@@ -323,19 +362,24 @@ class Trainer:
             root_logger.removeHandler(handler)
             handler.close()
 
-    def evaluate(self) -> float:
+        # After all epochs finish (or early stopping), save & upload the training-curves plot
+        self.plot_history()
+
+    def evaluate(self) -> tuple[float, float, float]:
         """
         Evaluates the model on the validation set.
         Logs and returns average loss and accuracy over the validation set.
 
         Returns:
-            float: Average loss on the validation set.
+            Tuple[float, float, float]: Average loss, metric, and perplexity on the validation set.
         """
         self.model.eval()
-        total_loss = 0
-        sum_acc = 0.0
+        # Reset perplexity metric before validation
+        self.perplexity.reset()
+        total_loss = 0.0
+        sum_metric = 0.0
         with torch.no_grad():
-            pbar = tqdm(enumerate(self.val_loader), total=len(self.val_loader))
+            pbar = tqdm(enumerate(self.val_loader), total=len(self.val_loader), leave=False)
             for i, (inputs, targets) in pbar:
                 batch_num = i + 1
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
@@ -343,18 +387,20 @@ class Trainer:
                 loss = self.criterion(outputs, targets)
                 total_loss += loss.item()
 
-                batch_acc = self.metric(outputs, targets)
-                sum_acc += batch_acc.item()
+                batch_metric = self.metric(outputs, targets)
+                sum_metric += batch_metric
+                # Update perplexity metric with validation batch
+                self.perplexity.update(outputs, targets)
 
                 avg_loss = total_loss / batch_num
-                avg_accuracy = sum_acc / batch_num
-                pbar.set_description(f"Eval {self.criterion.name}: {avg_loss:.4f}, Eval {self.metric.name}: {avg_accuracy:.4f}")
+                avg_metric = sum_metric / batch_num
+                pbar.set_description(f"Eval {self.criterion.name}: {avg_loss:.4f}, Eval {self.metric.name}: {avg_metric:.4f}")
 
         avg_loss = total_loss / len(self.val_loader)
-        avg_accuracy = sum_acc / len(self.val_loader)
-        self.last_val_accuracy = avg_accuracy
-        print('*'*50)
-        return avg_loss
+        avg_metric = sum_metric / len(self.val_loader)
+        avg_metric = float(avg_metric)
+        avg_perplexity = self.perplexity.compute().item()
+        return avg_loss, avg_metric, avg_perplexity
 
     def save_model(self) -> None:
         os.makedirs(self.checkpoint_dir, exist_ok=True)
@@ -398,24 +444,43 @@ class Trainer:
 
     def plot_history(self) -> None:
         os.makedirs(self.config.output_dir, exist_ok=True)
-        plt.figure(figsize=(10, 4))
+        plt.figure(figsize=(15, 4))
 
-        plt.subplot(1, 2, 1)
-        plt.plot(self.history['train_loss'], label='Train Loss')
-        plt.plot(self.history['val_loss'], label='Validation Loss')
+        # Plot Loss
+        plt.subplot(1, 3, 1)
+        epochs = np.arange(1, len(self.history['train_loss']) + 1)
+        plt.plot(epochs, self.history['train_loss'], label='Train Loss')
+        plt.plot(epochs, self.history['val_loss'], label='Validation Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title('Loss over Epochs')
         plt.legend()
 
-        plt.subplot(1, 2, 2)
-        plt.plot(self.history['train_acc'], label='Train Accuracy')
-        plt.plot(self.history['val_acc'], label='Validation Accuracy')
+        # Plot Accuracy/Metric
+        plt.subplot(1, 3, 2)
+        plt.plot(epochs, self.history['train_metric'], label='Train ' + self.metric.name.capitalize())
+        plt.plot(epochs, self.history['val_metric'], label='Validation ' + self.metric.name.capitalize())
         plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.title('Accuracy over Epochs')
+        plt.ylabel(self.metric.name.capitalize())
+        plt.title(f'{self.metric.name.capitalize()} over Epochs')
+        plt.legend()
+
+        # Plot Perplexity
+        plt.subplot(1, 3, 3)
+        plt.plot(epochs, self.history['train_perplexity'], label='Train Perplexity')
+        plt.plot(epochs, self.history['val_perplexity'], label='Validation Perplexity')
+        plt.xlabel('Epoch')
+        plt.ylabel('Perplexity')
+        plt.title('Perplexity over Epochs')
         plt.legend()
 
         plt.tight_layout()
-        plt.savefig(os.path.join(self.config.output_dir, f"{self.config.model_name}_training_curves.png"))
+        plot_path = os.path.join(self.experiment_dir, f"{self.config.model_name}_training_curves.png")
+        plt.savefig(plot_path)
         plt.close()
+        if self.s3_client:
+            s3_plot_key = f"{self.config.s3_prefix}{self.config.model_name}/{self.config.model_name}_training_curves.png"
+            try:
+                self.s3_client.upload_file(plot_path, self.config.s3_bucket, s3_plot_key)
+            except Exception as e:
+                logger.warning(f"Could not upload training plot to S3: {e}")

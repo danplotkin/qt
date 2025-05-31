@@ -35,6 +35,7 @@ joblib==1.5.0
 jupyter_client==8.6.3
 jupyter_core==5.7.2
 kiwisolver==1.4.8
+lightning-utilities==0.14.3
 MarkupSafe==3.0.2
 matplotlib==3.10.1
 matplotlib-inline==0.1.7
@@ -77,6 +78,7 @@ sympy==1.14.0
 threadpoolctl==3.6.0
 tokenizers==0.21.1
 torch==2.7.0
+torchmetrics==1.7.2
 tornado==6.4.2
 tqdm==4.67.1
 traitlets==5.14.3
