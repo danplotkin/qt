@@ -371,6 +371,7 @@ class Trainer:
         # After all epochs finish (or early stopping), save & upload the training-curves plot
         self.plot_history()
 
+    @torch.no_grad()
     def evaluate(self) -> tuple[float, float, float]:
         """
         Evaluates the model on the validation set.
@@ -384,23 +385,22 @@ class Trainer:
         self.perplexity.reset()
         total_loss = 0.0
         sum_metric = 0.0
-        with torch.no_grad():
-            pbar = tqdm(enumerate(self.val_loader), total=len(self.val_loader), leave=False)
-            for i, (inputs, targets) in pbar:
-                batch_num = i + 1
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                total_loss += loss.item()
+        pbar = tqdm(enumerate(self.val_loader), total=len(self.val_loader), leave=False)
+        for i, (inputs, targets) in pbar:
+            batch_num = i + 1
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
+            outputs = self.model(inputs)
+            loss = self.criterion(outputs, targets)
+            total_loss += loss.item()
 
-                batch_metric = self.metric(outputs, targets)
-                sum_metric += batch_metric
-                # Update perplexity metric with validation batch
-                self.perplexity.update(outputs, targets)
+            batch_metric = self.metric(outputs, targets)
+            sum_metric += batch_metric
+            # Update perplexity metric with validation batch
+            self.perplexity.update(outputs, targets)
 
-                avg_loss = total_loss / batch_num
-                avg_metric = sum_metric / batch_num
-                pbar.set_description(f"Eval {self.criterion.name}: {avg_loss:.4f}, Eval {self.metric.name}: {avg_metric:.4f}")
+            avg_loss = total_loss / batch_num
+            avg_metric = sum_metric / batch_num
+            pbar.set_description(f"Eval {self.criterion.name}: {avg_loss:.4f}, Eval {self.metric.name}: {avg_metric:.4f}")
 
         avg_loss = total_loss / len(self.val_loader)
         avg_metric = sum_metric / len(self.val_loader)
@@ -494,6 +494,7 @@ class Trainer:
             except Exception as e:
                 logger.warning(f"Could not upload training plot to S3: {e}")
 
+    @torch.no_grad()
     def test(self, test_loader: torch.utils.data.DataLoader) -> tuple[float, float, float]:
         """
         Evaluates the model on a test set.
@@ -508,21 +509,20 @@ class Trainer:
         self.perplexity.reset()
         total_loss = 0.0
         sum_metric = 0.0
-        with torch.no_grad():
-            pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
-            for i, (inputs, targets) in pbar:
-                inputs, targets = inputs.to(self.device), targets.to(self.device)
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                total_loss += loss.item()
+        pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
+        for i, (inputs, targets) in pbar:
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
+            outputs = self.model(inputs)
+            loss = self.criterion(outputs, targets)
+            total_loss += loss.item()
 
-                batch_metric = self.metric(outputs, targets)
-                sum_metric += batch_metric
-                self.perplexity.update(outputs, targets)
+            batch_metric = self.metric(outputs, targets)
+            sum_metric += batch_metric
+            self.perplexity.update(outputs, targets)
 
-                avg_loss = total_loss / (i + 1)
-                avg_metric = sum_metric / (i + 1)
-                pbar.set_description(f"Test {self.criterion.name}: {avg_loss:.4f}, Test {self.metric.name}: {avg_metric:.4f}")
+            avg_loss = total_loss / (i + 1)
+            avg_metric = sum_metric / (i + 1)
+            pbar.set_description(f"Test {self.criterion.name}: {avg_loss:.4f}, Test {self.metric.name}: {avg_metric:.4f}")
 
         avg_loss = total_loss / len(test_loader)
         avg_metric = float(sum_metric / len(test_loader))
