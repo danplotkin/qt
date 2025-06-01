@@ -2,4 +2,4 @@
 echo "Pretraining..."
 sleep 3
 
-venv/bin/python scripts/pretrain.py #--init-bias
+venv/bin/python scripts/pretrain.py --init-bias
