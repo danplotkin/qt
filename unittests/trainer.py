@@ -77,6 +77,7 @@ def test_trainer_runs_without_error():
     )
 
     trainer.train()
+    trainer.test(val_loader) # Not a test loader but act like it is
 
 
 if __name__ == '__main__':

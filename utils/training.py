@@ -493,3 +493,59 @@ class Trainer:
                 self.s3_client.upload_file(plot_path, self.config.s3_bucket, s3_plot_key)
             except Exception as e:
                 logger.warning(f"Could not upload training plot to S3: {e}")
+
+    def test(self, test_loader: torch.utils.data.DataLoader) -> tuple[float, float, float]:
+        """
+        Evaluates the model on a test set.
+
+        Args:
+            test_loader (DataLoader): DataLoader for test data.
+
+        Returns:
+            Tuple[float, float, float]: Average loss, metric, and perplexity on the test set.
+        """
+        self.model.eval()
+        self.perplexity.reset()
+        total_loss = 0.0
+        sum_metric = 0.0
+        with torch.no_grad():
+            pbar = tqdm(enumerate(test_loader), total=len(test_loader), leave=False)
+            for i, (inputs, targets) in pbar:
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                total_loss += loss.item()
+
+                batch_metric = self.metric(outputs, targets)
+                sum_metric += batch_metric
+                self.perplexity.update(outputs, targets)
+
+                avg_loss = total_loss / (i + 1)
+                avg_metric = sum_metric / (i + 1)
+                pbar.set_description(f"Test {self.criterion.name}: {avg_loss:.4f}, Test {self.metric.name}: {avg_metric:.4f}")
+
+        avg_loss = total_loss / len(test_loader)
+        avg_metric = float(sum_metric / len(test_loader))
+        avg_perplexity = self.perplexity.compute().item()
+
+        print(f"[TEST] Loss: {avg_loss:.4f}, {self.metric.name.capitalize()}: {avg_metric:.4f}, Perplexity: {avg_perplexity:.4f}")
+
+        # Save test results locally
+        test_results = {
+            "loss": avg_loss,
+            self.metric.name: avg_metric,
+            "perplexity": avg_perplexity
+        }
+        test_result_path = os.path.join(self.experiment_dir, "test_results.json")
+        with open(test_result_path, "w") as f:
+            json.dump(test_results, f, indent=2)
+
+        # Upload to S3 if configured
+        if self.s3_client:
+            test_result_key = f"{self.config.s3_prefix}{self.config.model_name}/test_results.json"
+            try:
+                self.s3_client.upload_file(test_result_path, self.config.s3_bucket, test_result_key)
+            except Exception as e:
+                logger.warning(f"Could not upload test results to S3: {e}")
+
+        return avg_loss, avg_metric, avg_perplexity
