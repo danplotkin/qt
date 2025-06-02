@@ -9,7 +9,7 @@ training_configs: TrainingConfigs = configs['training']
 
 
 s3_bucket = training_configs.s3_bucket
-s3_prefix = training_configs.s3_prefix
+s3_prefix = 'data'
 local_dir = "data/flattened_corpa"
 
 

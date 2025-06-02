@@ -10,7 +10,7 @@ training_configs: TrainingConfigs = configs['training']
 
 
 s3_bucket = training_configs.s3_bucket
-s3_prefix = training_configs.s3_prefix
+s3_prefix = 'data'
 
 
 def upload_directory_to_s3(local_dir, bucket, prefix):

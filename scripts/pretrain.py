@@ -80,6 +80,7 @@ def main():
 
     trainer = configure_trainer(init_bias=args.init_bias)
     trainer.train()
+    trainer.test()
 
 
 if __name__ == '__main__':
