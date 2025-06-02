@@ -11,8 +11,8 @@ training:
   early_stopping_mode: "min"
   restore_best_model: true
   logging_dir: "./logs"
-  # s3_bucket: "your-bucket-name"
-  # s3_prefix: "your/prefix/"
+  s3_bucket: "dp-jh-nb-bucket"
+  s3_prefix: "QT"
 
 # qt configs
 transformer:
