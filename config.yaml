@@ -14,22 +14,12 @@ training:
   # s3_bucket: "your-bucket-name"
   # s3_prefix: "your/prefix/"
 
-# smaller testing config
+# qt configs
 transformer:
   tgt_vocab_size: 50257
-  d_model: 768
-  num_heads: 8
-  num_layers: 6
-  d_ff: 2048
-  max_seq_length: 512
+  d_model: 2048
+  num_heads: 16
+  num_layers: 14
+  d_ff: 8192
+  max_seq_length: 2048
   dropout: 0.1
-
-# qt configs
-# transformer:
-#   tgt_vocab_size: 50257
-#   d_model: 2048
-#   num_heads: 16
-#   num_layers: 14
-#   d_ff: 8192
-#   max_seq_length: 2048
-#   dropout: 0.1
