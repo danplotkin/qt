@@ -110,7 +110,7 @@ class Trainer:
         else:
             self.s3_client = None
         # Setup unified experiment directory structure
-        self.experiment_dir = os.path.join(self.config.output_dir, self.config.model_name)
+        self.experiment_dir = os.path.join(self.config.output_dir, self.transformer_config.model_name)
         self.checkpoint_dir = os.path.join(self.experiment_dir, "checkpoints")
         self.log_dir = os.path.join(self.experiment_dir, "logs")
         os.makedirs(self.checkpoint_dir, exist_ok=True)
@@ -126,7 +126,7 @@ class Trainer:
             for key, value in asdict(self.transformer_config).items():
                 f.write(f"{key}: {value}\n")
         if self.s3_client:
-            txt_s3_key = f"{self.config.s3_prefix}/{self.config.model_name}/config.txt"
+            txt_s3_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/config.txt"
             self.s3_client.upload_file(config_txt_path, self.config.s3_bucket, txt_s3_key)
 
         # Download existing artifacts from S3 to local dirs
@@ -141,11 +141,11 @@ class Trainer:
                     for obj in page.get('Contents', []):
                         key = obj['Key']
                         rel = key[len(prefix):] if key.startswith(prefix) else key
-                        if rel.startswith(f"{self.config.model_name}/checkpoints") and rel.endswith('.pt'):
+                        if rel.startswith(f"{self.transformer_config.model_name}/checkpoints") and rel.endswith('.pt'):
                             dest = os.path.join(self.checkpoint_dir, os.path.basename(rel))
-                        elif rel.startswith(f"{self.config.model_name}/logs") and rel.endswith('.log'):
+                        elif rel.startswith(f"{self.transformer_config.model_name}/logs") and rel.endswith('.log'):
                             dest = os.path.join(self.log_dir, os.path.basename(rel))
-                        elif rel == f"{self.config.model_name}/config.yaml" or rel.endswith('best_epoch.json'):
+                        elif rel == f"{self.transformer_config.model_name}/config.yaml" or rel.endswith('best_epoch.json'):
                             dest = os.path.join(self.experiment_dir, os.path.basename(rel))
                         else:
                             continue
@@ -156,7 +156,7 @@ class Trainer:
                 logger.warning(f"Could not download existing artifacts from S3: {e}")
         # Load history if exists
         history_path = os.path.join(self.experiment_dir, "history.json")
-        s3_history_key = f"{self.config.s3_prefix}/{self.config.model_name}/history.json"
+        s3_history_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/history.json"
         # Attempt to download from S3
         if self.s3_client:
             try:
@@ -185,7 +185,7 @@ class Trainer:
         self.scaler = torch.amp.GradScaler("cuda")
         # Load existing weights: prefer best, else latest epoch checkpoint
         checkpoint_dir = self.checkpoint_dir
-        model_name = self.config.model_name
+        model_name = self.transformer_config.model_name
         print(f"[INFO] Checking for existing model checkpoints in {checkpoint_dir}")
         try:
             best_path = os.path.join(checkpoint_dir, f"{model_name}_best.pt")
@@ -344,7 +344,7 @@ class Trainer:
                     self.s3_client.upload_file(
                         best_info_path,
                         self.config.s3_bucket,
-                        f"{self.config.s3_prefix}/{self.config.model_name}/best_epoch.json"
+                        f"{self.config.s3_prefix}/{self.transformer_config.model_name}/best_epoch.json"
                     )
                 print('*'*50)
 
@@ -366,7 +366,7 @@ class Trainer:
                 json.dump(self.history, hf, indent=2)
             # Upload history to S3
             if self.s3_client:
-                s3_history_key = f"{self.config.s3_prefix}/{self.config.model_name}/history.json"
+                s3_history_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/history.json"
                 self.s3_client.upload_file(history_path, self.config.s3_bucket, s3_history_key)
             # Remove epoch log handler
             root_logger.removeHandler(handler)
@@ -414,11 +414,11 @@ class Trainer:
 
     def save_model(self) -> None:
         os.makedirs(self.checkpoint_dir, exist_ok=True)
-        model_path = os.path.join(self.checkpoint_dir, f"{self.config.model_name}.pt")
+        model_path = os.path.join(self.checkpoint_dir, f"{self.transformer_config.model_name}.pt")
         torch.save(self.model.state_dict(), model_path)
         # Upload to S3 if configured
         if self.s3_client:
-            s3_key = f"{self.config.s3_prefix}/{self.config.model_name}/checkpoints/{self.config.model_name}.pt"
+            s3_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/checkpoints/{self.transformer_config.model_name}.pt"
             self.s3_client.upload_file(model_path, self.config.s3_bucket, s3_key)
             # Upload log files if they exist
             if os.path.exists(self.log_dir):
@@ -426,7 +426,7 @@ class Trainer:
                     self.s3_client.upload_file(
                         os.path.join(self.log_dir, fname),
                         self.config.s3_bucket,
-                        f"{self.config.s3_prefix}/{self.config.model_name}/logs/{fname}"
+                        f"{self.config.s3_prefix}/{self.transformer_config.model_name}/logs/{fname}"
                     )
 
     def _save_checkpoint(self, epoch: Optional[int] = None, is_best: bool = False) -> None:
@@ -436,19 +436,19 @@ class Trainer:
         If is_best is True, saves as <model_name>_best.pt.
         """
         suffix = "_best" if is_best else f"_epoch{epoch}"
-        checkpoint_path = os.path.join(self.checkpoint_dir, f"{self.config.model_name}{suffix}.pt")
+        checkpoint_path = os.path.join(self.checkpoint_dir, f"{self.transformer_config.model_name}{suffix}.pt")
         torch.save({
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict()
         }, checkpoint_path)
         if self.s3_client:
-            s3_key = f"{self.config.s3_prefix}/{self.config.model_name}/checkpoints/{self.config.model_name}{suffix}.pt"
+            s3_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/checkpoints/{self.transformer_config.model_name}{suffix}.pt"
             self.s3_client.upload_file(checkpoint_path, self.config.s3_bucket, s3_key)
             # Upload log files if they exist
             log_path = self.log_dir
             if os.path.exists(log_path):
                 for fname in os.listdir(log_path):
-                    log_key = f"{self.config.s3_prefix}/{self.config.model_name}/logs/{os.path.basename(fname)}"
+                    log_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/logs/{os.path.basename(fname)}"
                     self.s3_client.upload_file(
                         os.path.join(log_path, fname),
                         self.config.s3_bucket,
@@ -488,11 +488,11 @@ class Trainer:
         plt.legend()
 
         plt.tight_layout()
-        plot_path = os.path.join(self.experiment_dir, f"{self.config.model_name}_training_curves.png")
+        plot_path = os.path.join(self.experiment_dir, f"{self.transformer_config.model_name}_training_curves.png")
         plt.savefig(plot_path)
         plt.close()
         if self.s3_client:
-            s3_plot_key = f"{self.config.s3_prefix}/{self.config.model_name}/{self.config.model_name}_training_curves.png"
+            s3_plot_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/{self.transformer_config.model_name}_training_curves.png"
             try:
                 self.s3_client.upload_file(plot_path, self.config.s3_bucket, s3_plot_key)
             except Exception as e:
@@ -546,7 +546,7 @@ class Trainer:
 
         # Upload to S3 if configured
         if self.s3_client:
-            test_result_key = f"{self.config.s3_prefix}/{self.config.model_name}/test_results.json"
+            test_result_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/test_results.json"
             try:
                 self.s3_client.upload_file(test_result_path, self.config.s3_bucket, test_result_key)
             except Exception as e:
