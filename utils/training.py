@@ -179,6 +179,8 @@ class Trainer:
             self.early_stopping = None
         # Track best validation loss for uploading best model
         self.best_val_loss = float('inf')
+        # Initialize GradScaler for mixed precision training
+        self.scaler = torch.cuda.amp.GradScaler()
         # Load existing weights: prefer best, else latest epoch checkpoint
         checkpoint_dir = self.checkpoint_dir
         model_name = self.config.model_name
@@ -255,18 +257,16 @@ class Trainer:
                 # targets is shaped (batch, seq_len)
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
+                # Forward pass and loss computation with mixed precision
+                with torch.amp.autocast("cuda"):
+                    logits = self.model(inputs)  # batch, seq_len, vocab_size
+                    loss = self.criterion(logits, targets)
 
-                # Forward pass
-                logits = self.model(inputs) # batch, seq_len, vocab_size
-                loss = self.criterion(logits, targets)
-
-                # Backward pass
-                loss.backward()
-                # Gradient clipping to prevent exploding gradients
+                self.scaler.scale(loss).backward()
+                self.scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                self.optimizer.step()
-
-                # TODO fp32 stuff, casting or at init?
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
 
                 epoch_loss += loss.item()
                 
