@@ -21,8 +21,15 @@ def upload_directory_to_s3(local_dir, bucket, prefix):
                 local_path = os.path.join(root, file)
                 relative_path = os.path.relpath(local_path, local_dir)
                 s3_key = f"{prefix}/{relative_path}"
-                print(f"Uploading {local_path} to s3://{bucket}/{s3_key}")
-                s3.upload_file(local_path, bucket, s3_key)
+                try:
+                    s3.head_object(Bucket=bucket, Key=s3_key)
+                    print(f"Skipping {local_path}, already exists in s3://{bucket}/{s3_key}")
+                except s3.exceptions.ClientError as e:
+                    if e.response['Error']['Code'] == "404":
+                        print(f"Uploading {local_path} to s3://{bucket}/{s3_key}")
+                        s3.upload_file(local_path, bucket, s3_key)
+                    else:
+                        raise
 
 
 if __name__ == "__main__":

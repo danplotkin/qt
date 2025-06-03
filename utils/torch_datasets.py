@@ -7,10 +7,21 @@ from typing import Literal
 import os
 from utils.tokenizer import get_tokenizer
 #
-# Define subreddit file lists for train/val/test splits
-REDDIT_TRAIN_FILES = ['bestof.pt', 'bodyweightfitness.pt', 'buildapc.pt', 'explainlikeimfive.pt']
-REDDIT_VAL_FILES = ['tifu.pt']
-REDDIT_TEST_FILES = ['WritingPrompts.pt']
+
+# Define subreddit file lists for train/val/test splits (all 14 subreddits)
+REDDIT_TRAIN_FILES = [
+    'bestof.pt', 'bodyweightfitness.pt', 'buildapc.pt',
+    'Documentaries.pt', 'explainlikeimfive.pt', 'history.pt',
+    'philosophy.pt', 'podcasts.pt'
+]
+
+REDDIT_VAL_FILES = [
+    'programming.pt', 'socialskills.pt', 'tifu.pt'
+]
+
+REDDIT_TEST_FILES = [
+    'WritingPrompts.pt', 'YouShouldKnow.pt'
+]
 
 
 
