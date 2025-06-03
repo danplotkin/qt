@@ -33,7 +33,10 @@ def tokenize_and_flatten_stream(tokenizer, subreddit_name):
 
 def main():
     tokenizer = get_tokenizer()
-    subreddits = ["bestof", "bodyweightfitness", "buildapc", "tifu", "explainlikeimfive", "WritingPrompts"]
+    # Dan's reddits
+    # subreddits = ["bestof", "bodyweightfitness", "buildapc", "tifu", "explainlikeimfive", "WritingPrompts"]
+    # Jack's reddits
+    subreddits = ["podcasts"]
 
     for subreddit in subreddits:
         output_path = os.path.join(FLATTENED_CORPA_DIR, f"{subreddit}.pt")
