@@ -1,5 +1,6 @@
 import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 import shutil
 import glob
 import re
@@ -8,6 +9,7 @@ import torch
 import gc
 import torch.nn as nn
 import torch.nn.functional as F
+from torchinfo import summary
 from typing import Optional
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -86,6 +88,8 @@ class Trainer:
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
     ) -> None:
         self.model = model.to(device)
+        self.model_summary_str = str(summary(model))
+        logger.info(self.model_summary_str)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config

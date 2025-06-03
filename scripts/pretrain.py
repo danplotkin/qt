@@ -13,7 +13,7 @@ from utils.transformer.model import QT
 from utils.losses import SequenceLoss
 from utils.metrics import MaskedAccuracy
 from utils.tokenizer import get_tokenizer
-from utils.torch_datasets import PretrainedCorpaDataset
+from utils.torch_datasets import RedditCommentsDataset
 
 
 @torch.no_grad()
@@ -44,14 +44,15 @@ def init_output_bias_from_dataloader(model: QT, loader: DataLoader) -> None:
     model.fc.bias.data.copy_(bias)
 
 
-def configure_trainer(init_bias: bool = False) -> Trainer:
+def configure_trainer(init_bias: bool = False) -> tuple[Trainer, DataLoader]:
     tokenizer = get_tokenizer()
     configs = load_configs()
     training_configs: TrainingConfigs = configs['training']
     transformer_configs: TransformerConfigs = configs['transformer']
     model = QT(config=transformer_configs, tokenizer=tokenizer, device='cpu')
-    train_ds = PretrainedCorpaDataset(split='train', block_size=transformer_configs.max_seq_length)
-    val_ds = PretrainedCorpaDataset(split='val', block_size=transformer_configs.max_seq_length)
+    train_ds = RedditCommentsDataset(split='train', block_size=transformer_configs.max_seq_length)
+    val_ds = RedditCommentsDataset(split='val', block_size=transformer_configs.max_seq_length)
+    test_loader = RedditCommentsDataset(split='test', block_size=transformer_configs.max_seq_length)
     train_loader = DataLoader(train_ds, batch_size=training_configs.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=training_configs.batch_size, shuffle=False)
 
@@ -66,7 +67,7 @@ def configure_trainer(init_bias: bool = False) -> Trainer:
         criterion=SequenceLoss(ignore_index=tokenizer.pad_token_id),
         metric=MaskedAccuracy(padding_token_id=tokenizer.pad_token_id)
     )
-    return trainer
+    return trainer, test_loader
 
 
 def main():
@@ -78,9 +79,9 @@ def main():
     )
     args = parser.parse_args()
 
-    trainer = configure_trainer(init_bias=args.init_bias)
+    trainer, test_loader = configure_trainer(init_bias=args.init_bias)
     trainer.train()
-    trainer.test()
+    trainer.test(test_loader=test_loader)
 
 
 if __name__ == '__main__':

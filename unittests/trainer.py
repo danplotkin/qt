@@ -28,10 +28,10 @@ def test_trainer_runs_without_error():
     val_loader = DataLoader(val_dataset, batch_size=2)
 
     # Configs
-    config = TrainingConfigs(epochs=15, model_name='unittest')
-    transformer_config = TransformerConfigs(tgt_vocab_size=50_000, d_model=32, num_heads=2, num_layers=2, d_ff=64, max_seq_length=32, dropout=0.1)
+    config = TrainingConfigs(epochs=1, s3_bucket='dp-jh-nb-bucket', s3_prefix="QT")
+    transformer_config = TransformerConfigs(model_name='unittest',tgt_vocab_size=50_000, d_model=32, num_heads=2, num_layers=2, d_ff=64, max_seq_length=32, dropout=0.1)
 
-    shutil.rmtree(config.output_dir, ignore_errors=True)
+    # shutil.rmtree(config.output_dir, ignore_errors=True)
 
     # Model
     model = QT(
@@ -60,7 +60,7 @@ def test_trainer_runs_without_error():
     print('\n\nSimilating stop....', '\n\n')
     time.sleep(2)
 
-    config.epochs = 30
+    config.epochs = 2
     model_reloaded = QT(
         config=transformer_config,
         tokenizer=tokenizer,

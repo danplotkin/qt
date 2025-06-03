@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/home/ubuntu/qt/scripts/pretrain.py", line 11, in <module>
+    from utils.training import Trainer
+  File "/home/ubuntu/qt/utils/training.py", line 91
+    self.model_summary_str = str(summary(model))
+TabError: inconsistent use of tabs and spaces in indentation
+Reddit data: indexing train set...:   0%|          | 0/2 [00:00<?, ?it/s]                                                                         Reddit data: indexing val set...:   0%|          | 0/1 [00:00<?, ?it/s]                                                                       Reddit data: indexing test set...:   0%|          | 0/1 [00:00<?, ?it/s]                                                                        
