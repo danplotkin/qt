@@ -16,6 +16,7 @@ training:
 
 # qt configs
 transformer:
+  model_name: "qt-pretrain"
   tgt_vocab_size: 50257
   d_model: 2048
   num_heads: 16
