@@ -102,7 +102,7 @@ class MultiHeadAttention(nn.Module):
         attn_scores += bias
         
         if mask is not None:
-            attn_scores = attn_scores.masked_fill(mask == 0, -1e9)
+            attn_scores = attn_scores.masked_fill(mask == 0, -1e4)
         
         attn_probs = torch.softmax(attn_scores, dim=-1)
         

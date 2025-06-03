@@ -64,7 +64,7 @@ class RedditCommentsDataset(Dataset):
         self._token_cache = {}
 
         # Precompute index ranges per file and store file paths only
-        for i, file in tqdm(enumerate(self.files), total=len(self.files), desc=f"Reddit data: indexing {split} set..."):
+        for i, file in tqdm(enumerate(self.files), total=len(self.files), desc=f"Reddit data: indexing {split} set...", leave=False):
             path = os.path.join(dir, file)
             if not os.path.exists(path):
                 print(f"Warning: File does not exist and will be skipped: {path}")
@@ -146,9 +146,7 @@ class PretrainedCorpaDataset(Dataset):
         # Reddit uses 'val', MiniPile uses 'validation'
         reddit_dataset = RedditCommentsDataset(split=split, block_size=block_size, stride=stride)
         minipile_split = 'validation' if split == 'val' else split
-        print('Init minipile...')
         minipile_dataset = MiniPileDataset(split=minipile_split, block_size=block_size, stride=stride)
-        print('concat...')
         self.dataset = ConcatDataset([reddit_dataset, minipile_dataset])
 
     def __len__(self):
