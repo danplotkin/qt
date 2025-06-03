@@ -7,7 +7,6 @@ from utils.tokenizer import get_tokenizer
 
 @dataclass
 class TrainingConfigs:
-    model_name: str = "qt"
     learning_rate: float = 5e-5
     weight_decay: float = 0.01
     batch_size: int = 32
@@ -33,6 +32,7 @@ class TrainingConfigs:
 
 @dataclass
 class TransformerConfigs:
+    model_name: str = "qt"
     tgt_vocab_size: int = 5000
     d_model: int = 2048
     num_heads: int = 16
