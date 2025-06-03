@@ -91,14 +91,6 @@ class Trainer:
         self.model_summary_str = str(summary(model))
         logger.info(self.model_summary_str)
         # Save model summary to file
-        summary_path = os.path.join(self.experiment_dir, "summary.txt")
-        # Ensure experiment_dir exists before writing
-        os.makedirs(os.path.dirname(summary_path), exist_ok=True)
-        with open(summary_path, "w") as f:
-            f.write(self.model_summary_str)
-        if hasattr(self, "s3_client") and self.s3_client:
-            summary_s3_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/summary.txt"
-            self.s3_client.upload_file(summary_path, self.config.s3_bucket, summary_s3_key)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config
@@ -128,6 +120,14 @@ class Trainer:
         self.log_dir = os.path.join(self.experiment_dir, "logs")
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         os.makedirs(self.log_dir, exist_ok=True)
+        summary_path = os.path.join(self.experiment_dir, "summary.txt")
+        # Ensure experiment_dir exists before writing
+        os.makedirs(os.path.dirname(summary_path), exist_ok=True)
+        with open(summary_path, "w") as f:
+            f.write(self.model_summary_str)
+        if hasattr(self, "s3_client") and self.s3_client:
+            summary_s3_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/summary.txt"
+            self.s3_client.upload_file(summary_path, self.config.s3_bucket, summary_s3_key)
 
         # Save a plain-text summary of training config and transformer config
         config_txt_path = os.path.join(self.experiment_dir, "config.txt")
