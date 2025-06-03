@@ -5,6 +5,7 @@ from datasets import Dataset as HFDataset
 from tqdm import tqdm
 from typing import Literal
 import os
+import json
 from utils.tokenizer import get_tokenizer
 #
 
@@ -27,7 +28,7 @@ REDDIT_TEST_FILES = [
 
 class MiniPileDataset(Dataset):
     def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None, dir: str = 'data/flattened_corpa/minipile'):
-        self.tokens = torch.load(os.path.join(dir, split + '.pt'))
+        self.tokens = torch.load(os.path.join(dir, split + '.pt'), mmap=True)
         self.block_size = block_size
         self.stride = stride if stride is not None else block_size
         self.indices = list(range(0, len(self.tokens) - block_size, self.stride))
@@ -62,16 +63,28 @@ class RedditCommentsDataset(Dataset):
         self.total_chunks = 0
         self._token_cache = {}
 
-        # Precompute index ranges per file and load all tokens into cache
-        for i, file in enumerate(tqdm(self.files, desc=f"Reddit data: indexing {split} set...", leave=False)):
+        # Precompute index ranges per file and store file paths only
+        for i, file in tqdm(enumerate(self.files), total=len(self.files), desc=f"Reddit data: indexing {split} set..."):
             path = os.path.join(dir, file)
-            tokens = torch.load(path)
-            self._token_cache[i] = tokens
-            length = len(tokens)
+            if not os.path.exists(path):
+                print(f"Warning: File does not exist and will be skipped: {path}")
+                continue
+            meta_path = path.replace(".pt", ".json")
+            if not os.path.exists(meta_path):
+                print(f"Warning: Metadata file not found for {path}. Skipping.")
+                continue
+            try:
+                with open(meta_path, 'r') as f:
+                    meta = json.load(f)
+                length = meta['length']
+            except Exception as e:
+                print(f"Warning: Failed to load metadata for '{path}': {e}. Skipping this file.")
+                continue
             num_chunks = max(0, (length - block_size) // self.stride)
             self.file_lengths.append(num_chunks)
             self.file_offsets.append(self.total_chunks)
             self.total_chunks += num_chunks
+            self._token_cache[i] = path  # store the path instead of the tokens
 
     def __len__(self):
         return self.total_chunks
@@ -86,7 +99,10 @@ class RedditCommentsDataset(Dataset):
         else:
             raise IndexError(f"Index {idx} out of range")
 
-        tokens = self._token_cache[file_index]
+        path = self._token_cache.get(file_index)
+        if path is None:
+            raise KeyError(f"[RedditCommentsDataset] file_index {file_index} not found in _token_cache")
+        tokens = torch.load(path, mmap=True)
         start = local_idx * self.stride
         chunk = tokens[start : start + self.block_size + 1]
         input_tensor = chunk[:-1].clone().long()
@@ -130,7 +146,9 @@ class PretrainedCorpaDataset(Dataset):
         # Reddit uses 'val', MiniPile uses 'validation'
         reddit_dataset = RedditCommentsDataset(split=split, block_size=block_size, stride=stride)
         minipile_split = 'validation' if split == 'val' else split
+        print('Init minipile...')
         minipile_dataset = MiniPileDataset(split=minipile_split, block_size=block_size, stride=stride)
+        print('concat...')
         self.dataset = ConcatDataset([reddit_dataset, minipile_dataset])
 
     def __len__(self):

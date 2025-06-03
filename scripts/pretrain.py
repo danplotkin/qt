@@ -46,7 +46,7 @@ def init_output_bias_from_dataloader(model: QT, loader: DataLoader) -> None:
 
 def configure_trainer(init_bias: bool = False) -> Trainer:
     tokenizer = get_tokenizer()
-    configs = load_configs('unittests/test_config.yaml')
+    configs = load_configs()
     training_configs: TrainingConfigs = configs['training']
     transformer_configs: TransformerConfigs = configs['transformer']
     model = QT(config=transformer_configs, tokenizer=tokenizer, device='cpu')
