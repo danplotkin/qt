@@ -158,7 +158,7 @@ class Trainer:
                             dest = os.path.join(self.checkpoint_dir, os.path.basename(rel))
                         elif rel.startswith(f"{self.transformer_config.model_name}/logs") and rel.endswith('.log'):
                             dest = os.path.join(self.log_dir, os.path.basename(rel))
-                        elif rel == f"{self.transformer_config.model_name}/config.yaml" or rel == f"{self.transformer_config.model_name}/best_epoch.json":
+                        elif rel == f"{self.transformer_config.model_name}/config.yaml" or rel.endswith('best_epoch.json'):
                             dest = os.path.join(self.experiment_dir, os.path.basename(rel))
                         else:
                             continue
@@ -303,6 +303,11 @@ class Trainer:
             avg_metric = sum_metric / len(self.train_loader)
             avg_metric = float(avg_metric)
             avg_perplexity = self.perplexity.compute().item()
+            # Sanitize train perplexity
+            safe_perplexity = float(avg_perplexity)
+            if not np.isfinite(safe_perplexity):
+                logger.warning(f"Perplexity is not finite: {safe_perplexity}. Saving as large placeholder value.")
+                safe_perplexity = 1e9
 
             ## train logging
             train_str = (
@@ -319,22 +324,27 @@ class Trainer:
             if self.val_loader is not None:
                 val_loss, val_metric, val_perplexity = self.evaluate()
                 val_metric = float(val_metric)
+                # Sanitize validation perplexity
+                safe_val_perplexity = float(val_perplexity)
+                if not np.isfinite(safe_val_perplexity):
+                    logger.warning(f"Validation perplexity is not finite: {safe_val_perplexity}. Saving as large placeholder value.")
+                    safe_val_perplexity = 1e9
                 self.history['val_loss'].append(val_loss)
                 self.history['val_metric'].append(val_metric)
-                self.history['val_perplexity'].append(val_perplexity)
+                self.history['val_perplexity'].append(safe_val_perplexity)
                 # Log validation results
                 val_str = (
                     f"Epoch {epoch}/{self.config.epochs} VALIDATION - "
                     f"Loss: {val_loss:.4f}, "
                     f"{self.metric.name.capitalize()}: {val_metric:.4f}, "
-                    f"Perplexity: {val_perplexity:.4f}"
+                    f"Perplexity: {safe_val_perplexity:.4f}"
                 )
                 print(val_str)
                 logging.info(val_str)
 
             self.history['train_loss'].append(avg_loss)
             self.history['train_metric'].append(avg_metric)
-            self.history['train_perplexity'].append(avg_perplexity)
+            self.history['train_perplexity'].append(safe_perplexity)
 
             # Save checkpoint and upload
             self._save_checkpoint(epoch=epoch)
@@ -347,7 +357,7 @@ class Trainer:
                     "epoch": epoch,
                     "val_loss": val_loss,
                     "val_metric": val_metric,
-                    "val_perplexity": val_perplexity
+                    "val_perplexity": safe_val_perplexity
                 }
                 best_info_path = os.path.join(self.experiment_dir, "best_epoch.json")
                 with open(best_info_path, "w") as f:

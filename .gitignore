@@ -178,6 +178,7 @@ cython_debug/
 data/
 checkpoints/
 experiments/
+nohup.out
 
 
 *.pem
