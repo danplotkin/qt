@@ -30,8 +30,9 @@ For pretraining, in order of training...
 - [MiniPile](https://huggingface.co/datasets/JeanKaddour/minipile) (5.6GB)
 - bookscorpus (4.4GB)
 
-For instruction tuning:
+For conversation and instruction tuning:
 - [lightnovel-2048](https://huggingface.co/datasets/Chat-Error/lightnovel-2048)  (684MB)
+- [Twitter Customer Care Doc Prediction](https://github.com/IBM/twitter-customer-care-document-prediction) ()
 - [No_Robots](https://huggingface.co/datasets/HuggingFaceH4/no_robots) (11 MB)
 
 ## Project TODOs
