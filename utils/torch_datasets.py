@@ -23,6 +23,52 @@ REDDIT_TEST_FILES = [
 ]
 
 
+class NoRobotsDataset(Dataset):
+    def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, dir: str = 'data/no_robots'):
+        from datasets import load_from_disk
+        self.tokenizer = get_tokenizer()
+        self.block_size = block_size
+        self.dataset = load_from_disk(dir)[split]
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        item = self.dataset[idx]
+        messages = item["messages"]
+
+        # Extract system prompt if it exists
+        system_prompt = "You are a helpful assistant."
+        for msg in messages:
+            if msg["role"] == "system":
+                system_prompt = msg["content"]
+                break
+
+        # Build prompt from everything before the final assistant message
+        prompt_parts = [f"<|system|> {system_prompt}"]
+        for msg in messages[:-1]:
+            role = msg["role"]
+            if role == "user":
+                prompt_parts.append(f"<|user|> {msg['content']}")
+            elif role == "assistant":
+                prompt_parts.append(f"<|assistant|> {msg['content']}")
+
+        prompt_text = " ".join(prompt_parts)
+        final_response = messages[-1]["content"]
+        full_text = f"<s>{prompt_text} <|assistant|> {final_response} </s>"
+
+        tokens = self.tokenizer(
+            full_text,
+            truncation=True,
+            padding="max_length",
+            max_length=self.block_size + 1,
+            return_tensors="pt"
+        )["input_ids"].squeeze(0)
+
+        input_tensor = tokens[:-1].clone().long()
+        label_tensor = tokens[1:].clone().long()
+        return input_tensor, label_tensor
+    
 
 class MiniPileDataset(Dataset):
     def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None, dir: str = 'data/flattened_corpa/minipile'):
