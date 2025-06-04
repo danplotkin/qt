@@ -24,17 +24,47 @@ REDDIT_TEST_FILES = [
 
 
 class NoRobotsDataset(Dataset):
-    def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, dir: str = 'data/no_robots'):
+    def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None, dir: str = 'data/no_robots'):
         from datasets import load_from_disk
         self.tokenizer = get_tokenizer()
         self.block_size = block_size
+        self.stride = stride if stride is not None else block_size // 2
         self.dataset = load_from_disk(dir)[split]
 
+        # Precompute strided index mappings: (example_idx, chunk_start)
+        self.index_map = []
+        for i in range(len(self.dataset)):
+            item = self.dataset[i]
+            messages = item["messages"]
+
+            # Extract system prompt if it exists
+            system_prompt = "You are a helpful assistant."
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_prompt = msg["content"]
+                    break
+
+            prompt_parts = [f"<|system|> {system_prompt}"]
+            for msg in messages[:-1]:
+                role = msg["role"]
+                if role == "user":
+                    prompt_parts.append(f"<|user|> {msg['content']}")
+                elif role == "assistant":
+                    prompt_parts.append(f"<|assistant|> {msg['content']}")
+            prompt_text = " ".join(prompt_parts)
+            final_response = messages[-1]["content"]
+            full_text = f"<s>{prompt_text} <|assistant|> {final_response} </s>"
+
+            tokens = self.tokenizer(full_text)["input_ids"]
+            for start in range(0, max(0, len(tokens) - self.block_size), self.stride):
+                self.index_map.append((i, start))
+
     def __len__(self):
-        return len(self.dataset)
+        return len(self.index_map)
 
     def __getitem__(self, idx):
-        item = self.dataset[idx]
+        item_idx, start = self.index_map[idx]
+        item = self.dataset[item_idx]
         messages = item["messages"]
 
         # Extract system prompt if it exists
@@ -44,7 +74,6 @@ class NoRobotsDataset(Dataset):
                 system_prompt = msg["content"]
                 break
 
-        # Build prompt from everything before the final assistant message
         prompt_parts = [f"<|system|> {system_prompt}"]
         for msg in messages[:-1]:
             role = msg["role"]
@@ -52,21 +81,17 @@ class NoRobotsDataset(Dataset):
                 prompt_parts.append(f"<|user|> {msg['content']}")
             elif role == "assistant":
                 prompt_parts.append(f"<|assistant|> {msg['content']}")
-
         prompt_text = " ".join(prompt_parts)
         final_response = messages[-1]["content"]
         full_text = f"<s>{prompt_text} <|assistant|> {final_response} </s>"
 
-        tokens = self.tokenizer(
-            full_text,
-            truncation=True,
-            padding="max_length",
-            max_length=self.block_size + 1,
-            return_tensors="pt"
-        )["input_ids"].squeeze(0)
+        tokens = self.tokenizer(full_text)["input_ids"]
+        chunk = tokens[start : start + self.block_size + 1]
+        chunk = chunk + [self.tokenizer.pad_token_id] * (self.block_size + 1 - len(chunk))
 
-        input_tensor = tokens[:-1].clone().long()
-        label_tensor = tokens[1:].clone().long()
+        chunk = torch.tensor(chunk, dtype=torch.long)
+        input_tensor = chunk[:-1].clone().long()
+        label_tensor = chunk[1:].clone().long()
         return input_tensor, label_tensor
     
 
