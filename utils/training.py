@@ -158,7 +158,7 @@ class Trainer:
                             dest = os.path.join(self.checkpoint_dir, os.path.basename(rel))
                         elif rel.startswith(f"{self.transformer_config.model_name}/logs") and rel.endswith('.log'):
                             dest = os.path.join(self.log_dir, os.path.basename(rel))
-                        elif rel == f"{self.transformer_config.model_name}/config.yaml" or rel.endswith('best_epoch.json'):
+                        elif rel == f"{self.transformer_config.model_name}/config.yaml" or rel == f"{self.transformer_config.model_name}/best_epoch.json":
                             dest = os.path.join(self.experiment_dir, os.path.basename(rel))
                         else:
                             continue
