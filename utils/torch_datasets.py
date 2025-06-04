@@ -56,7 +56,7 @@ class NoRobotsDataset(Dataset):
             full_text = f"<s>{prompt_text} <|assistant|> {final_response} </s>"
 
             tokens = self.tokenizer(full_text)["input_ids"]
-            for start in range(0, max(0, len(tokens) - self.block_size), self.stride):
+            for start in range(0, max(1, len(tokens) - self.block_size + 1), self.stride):
                 self.index_map.append((i, start))
 
     def __len__(self):
