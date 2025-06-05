@@ -67,6 +67,17 @@ class QT(nn.Module):
         self.to(device)
         self.device = device
 
+    def resize_token_embeddings(self, new_vocab_size: int) -> None:
+        """Resize decoder embedding and tied output layer to match new vocab size"""
+        old_embedding_weight = self.decoder_embedding.weight.data
+        old_vocab_size, embedding_dim = old_embedding_weight.shape
+
+        new_embedding = nn.Embedding(new_vocab_size, embedding_dim)
+        new_embedding.weight.data[:old_vocab_size] = old_embedding_weight
+        self.decoder_embedding = new_embedding
+        self.fc = nn.Linear(embedding_dim, new_vocab_size)
+        self.fc.weight = self.decoder_embedding.weight  # Re-tie weights
+
     @torch.no_grad()
     def decode(
         self,

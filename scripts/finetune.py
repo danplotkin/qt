@@ -31,6 +31,7 @@ def configure_trainer() -> tuple[Trainer, DataLoader]:
     model = QT(config=transformer_configs, tokenizer=tokenizer, device='cpu')
     pretrained_weights = torch.load(PRETRAINED_WEIGHTS_PATH)['model_state_dict']
     model.load_state_dict(pretrained_weights)
+    model.resize_token_embeddings(len(tokenizer))
     logging.info("Loaded pretrained weights from %s", PRETRAINED_WEIGHTS_PATH)
     train_ds = FineTuneCorpusDataset(split='train', block_size=transformer_configs.max_seq_length)
     val_ds = FineTuneCorpusDataset(split='validation', block_size=transformer_configs.max_seq_length)
