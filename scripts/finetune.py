@@ -7,7 +7,7 @@ from utils.training import Trainer
 from utils.losses import SequenceLoss
 from utils.metrics import MaskedAccuracy
 from utils.transformer.model import QT
-from utils.torch_datasets import NoRobotsDataset
+from utils.torch_datasets import FineTuneCorpusDataset
 
 import torch
 import torch.nn as nn
@@ -32,9 +32,9 @@ def configure_trainer() -> tuple[Trainer, DataLoader]:
     pretrained_weights = torch.load(PRETRAINED_WEIGHTS_PATH)
     model.load_state_dict(pretrained_weights)
     logging.info("Loaded pretrained weights from %s", PRETRAINED_WEIGHTS_PATH)
-    train_ds = NoRobotsDataset(split='train', block_size=transformer_configs.max_seq_length)
-    val_ds = NoRobotsDataset(split='validation', block_size=transformer_configs.max_seq_length)
-    test_ds = NoRobotsDataset(split='test', block_size=transformer_configs.max_seq_length)
+    train_ds = FineTuneCorpusDataset(split='train', block_size=transformer_configs.max_seq_length)
+    val_ds = FineTuneCorpusDataset(split='validation', block_size=transformer_configs.max_seq_length)
+    test_ds = FineTuneCorpusDataset(split='test', block_size=transformer_configs.max_seq_length)
     logging.info("Prepared NoRobotsDataset for train, validation, and test splits.")
     train_loader = DataLoader(train_ds, batch_size=training_configs.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=training_configs.batch_size, shuffle=False)

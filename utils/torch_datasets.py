@@ -95,6 +95,56 @@ class NoRobotsDataset(Dataset):
         return input_tensor, label_tensor
     
 
+class TwitterCustomerCareDataset(Dataset):
+    def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None, dir: str = 'data/twitter'):
+        from datasets import load_from_disk
+        self.tokenizer = get_tokenizer()
+        self.block_size = block_size
+        self.stride = stride if stride is not None else block_size // 2
+        self.dataset = load_from_disk(dir)[split]
+
+        self.index_map = []
+        for i in range(len(self.dataset)):
+            item = self.dataset[i]
+            system_prompt = "You are a helpful assistant helping with users with customer service requests."
+
+            prompt_parts = [f"<|system|> {system_prompt}"]
+            for turn in item["dialogContent"]:
+                role_tag = "<|user|>" if turn["agent"] is None else "<|assistant|>"
+                message = turn["message"].strip()
+                if message:
+                    prompt_parts.append(f"{role_tag} {message}")
+            agent_response = item["agentURL"]["url_utterance"].strip()
+            full_text = f"<s>{' '.join(prompt_parts)} <|assistant|> {agent_response} </s>"
+            tokens = self.tokenizer(full_text)["input_ids"]
+            for start in range(0, max(1, len(tokens) - self.block_size + 1), self.stride):
+                self.index_map.append((i, start))
+
+    def __len__(self):
+        return len(self.index_map)
+
+    def __getitem__(self, idx):
+        item_idx, start = self.index_map[idx]
+        item = self.dataset[item_idx]
+        system_prompt = "You are a helpful assistant helping with users with customer service requests."
+
+        prompt_parts = [f"<|system|> {system_prompt}"]
+        for turn in item["dialogContent"]:
+            role_tag = "<|user|>" if turn["agent"] is None else "<|assistant|>"
+            message = turn["message"].strip()
+            if message:
+                prompt_parts.append(f"{role_tag} {message}")
+        agent_response = item["agentURL"]["url_utterance"].strip()
+        full_text = f"<s>{' '.join(prompt_parts)} <|assistant|> {agent_response} </s>"
+        tokens = self.tokenizer(full_text)["input_ids"]
+        chunk = tokens[start : start + self.block_size + 1]
+        chunk = chunk + [self.tokenizer.pad_token_id] * (self.block_size + 1 - len(chunk))
+        chunk = torch.tensor(chunk, dtype=torch.long)
+        input_tensor = chunk[:-1].clone().long()
+        label_tensor = chunk[1:].clone().long()
+        return input_tensor, label_tensor
+    
+
 class MiniPileDataset(Dataset):
     def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None, dir: str = 'data/flattened_corpa/minipile'):
         self.tokens = torch.load(os.path.join(dir, split + '.pt'), mmap=True)
@@ -217,6 +267,19 @@ class PretrainedCorpaDataset(Dataset):
         minipile_split = 'validation' if split == 'val' else split
         minipile_dataset = MiniPileDataset(split=minipile_split, block_size=block_size, stride=stride)
         self.dataset = ConcatDataset([reddit_dataset, minipile_dataset])
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+
+class FineTuneCorpusDataset(Dataset):
+    def __init__(self, split: Literal['train', 'validation', 'test'], block_size: int, stride: int = None):
+        no_robots_dataset = NoRobotsDataset(split=split, block_size=block_size, stride=stride)
+        twitter_dataset = TwitterCustomerCareDataset(split=split, block_size=block_size, stride=stride)
+        self.dataset = ConcatDataset([no_robots_dataset, twitter_dataset])
 
     def __len__(self):
         return len(self.dataset)

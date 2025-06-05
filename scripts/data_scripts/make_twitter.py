@@ -5,7 +5,7 @@ import json
 from datasets import load_dataset, load_from_disk, Dataset, DatasetDict
 sys.path.append(os.getcwd())
 
-DATA_PATH = 'data/twitter_original'
+DATA_PATH = 'twitter-customer-care-document-prediction'
 DS_OUTPUT_DIR = 'data/twitter'
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
