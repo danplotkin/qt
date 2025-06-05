@@ -16,7 +16,7 @@ training:
 
 # qt configs
 transformer:
-  model_name: "qt-pretrain"
+  model_name: "qt-finetuned"
   tgt_vocab_size: 50257
   d_model: 736
   num_heads: 8
