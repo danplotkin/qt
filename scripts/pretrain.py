@@ -52,9 +52,10 @@ def configure_trainer(init_bias: bool = False) -> tuple[Trainer, DataLoader]:
     model = QT(config=transformer_configs, tokenizer=tokenizer, device='cpu')
     train_ds = RedditCommentsDataset(split='train', block_size=transformer_configs.max_seq_length)
     val_ds = RedditCommentsDataset(split='val', block_size=transformer_configs.max_seq_length)
-    test_loader = RedditCommentsDataset(split='test', block_size=transformer_configs.max_seq_length)
+    test_ds = RedditCommentsDataset(split='test', block_size=transformer_configs.max_seq_length)
     train_loader = DataLoader(train_ds, batch_size=training_configs.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=training_configs.batch_size, shuffle=False)
+    test_loader = DataLoader(test_ds, batch_size=training_configs.batch_size, shuffle=False)
 
     if init_bias:
         init_output_bias_from_dataloader(model, train_loader)
