@@ -23,7 +23,6 @@ class QT(nn.Module):
         device: torch.device
     ) -> None:
         super(QT, self).__init__()
-        self.to(device) # Put model on device on init
         self.device = device
         self.tokenizer = tokenizer
         self.decoder_embedding = nn.Embedding(config.tgt_vocab_size, config.d_model)
@@ -34,6 +33,7 @@ class QT(nn.Module):
         self.fc = nn.Linear(config.d_model, config.tgt_vocab_size)
         self.fc.weight = self.decoder_embedding.weight # NOTE tie weights
         self.dropout = nn.Dropout(config.dropout)
+        self.to(device) # Put model on device on init
 
     def generate_mask(self, tgt: torch.Tensor) -> torch.Tensor:
         """Generate casual and padding mask"""
@@ -77,6 +77,7 @@ class QT(nn.Module):
         self.decoder_embedding = new_embedding
         self.fc = nn.Linear(embedding_dim, new_vocab_size)
         self.fc.weight = self.decoder_embedding.weight  # Re-tie weights
+        self.to(self.device)  # Ensure new layers are moved to the correct device
 
     @torch.no_grad()
     def decode(
@@ -101,6 +102,7 @@ class QT(nn.Module):
         Returns:
             Generated text or token list
         """
+        self.eval()
         if method == "greedy":
             return self._decode_greedy(text, max_tokens=max_tokens, return_tokens=return_tokens)
         elif method == "beam":
@@ -124,7 +126,8 @@ class QT(nn.Module):
 
     @torch.no_grad()
     def _decode_greedy(self, text: str, max_tokens: int = 100, return_tokens: bool = False) -> Union[str, list[int]]:
-        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device) # Tokenize text
+        device = next(self.parameters()).device
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(device) # Tokenize text
         inference_tokens = []
         
         for _ in range(max_tokens):
@@ -148,7 +151,8 @@ class QT(nn.Module):
     
     @torch.no_grad()
     def _decode_beam(self, text: str, max_tokens: int = 100, return_tokens: bool = False, beam_size: int = 3) -> Union[str, list[int]]:
-        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device)
+        device = next(self.parameters()).device
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(device)
         sequences = [(tgt, 0)]  # (tokens, log_prob)
 
         for _ in range(max_tokens):
@@ -180,7 +184,8 @@ class QT(nn.Module):
 
     @torch.no_grad()
     def _decode_sample(self, text: str, max_tokens: int = 100, return_tokens: bool = False, tau: float = 1.0) -> Union[str, list[int]]:
-        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device) # Tokenize text
+        device = next(self.parameters()).device
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(device) # Tokenize text
         inference_tokens = []
 
         for _ in range(max_tokens):
@@ -216,7 +221,8 @@ class QT(nn.Module):
         """
         Top-k sampling decoding: at each step, sample from the top k logits.
         """
-        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device)
+        device = next(self.parameters()).device
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(device)
         inference_tokens = []
 
         for _ in range(max_tokens):
@@ -252,7 +258,8 @@ class QT(nn.Module):
         Nucleus (top-p) sampling decoding: at each step, sample from the smallest set of tokens
         whose cumulative probability mass exceeds p.
         """
-        tgt = self.tokenizer.encode(text, return_tensors='pt').to(self.device)
+        device = next(self.parameters()).device
+        tgt = self.tokenizer.encode(text, return_tensors='pt').to(device)
         inference_tokens = []
 
         for _ in range(max_tokens):
