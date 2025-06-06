@@ -2,7 +2,7 @@
 training:
   learning_rate: 1e-4
   batch_size: 32
-  epochs: 20
+  epochs: 50
   weight_decay: 0.01
   output_dir: "./experiments"
   early_stopping: true
