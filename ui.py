@@ -41,9 +41,9 @@ os.system('clear')
 print(logo_str)
 print(info_string)
 
-# load config and model
-# model_dir = f'./experiments/qt-finetuned/'
-model_dir = f'./experiments/qt-pretrain/'
+## load model with configs
+model_dir = f'./experiments/qt-finetuned/'
+# model_dir = f'./experiments/qt-pretrain/'
 config = load_configs(path=model_dir+f'config.yaml')
 tokenizer = get_tokenizer()
 model = QT(
@@ -51,11 +51,13 @@ model = QT(
     tokenizer=tokenizer,
     device=device,
 )
-# model_dict = torch.load(model_dir+'checkpoints/qt-finetuned_best.pt')
-model_dict = torch.load(model_dir+'checkpoints/qt-pretrain_best.pt')
+model_dict = torch.load(model_dir+'checkpoints/qt-finetuned_best.pt')
+# model_dict = torch.load(model_dir+'checkpoints/qt-pretrain_best.pt')
 model.load_state_dict(model_dict['model_state_dict'])
 model.eval()
 
+
+# 
 user_prompt_string = f'  Talk to {bcolors.CYAN}q{bcolors.ENDC}{bcolors.BLUE}T{bcolors.ENDC}: '
 
 context = ''
@@ -65,13 +67,17 @@ while True:
     if user_input in ['q', 'quit']:
         print('')
         break
-
+    
+    # add user input to context
     context += user_input
+    # cutoff context
+    context = context[:1024]
 
     model_response = model.decode(
         text = context,
-        return_stream = False
-
+        return_stream = False,
+        method = 'topk',
+        max_tokens=config['transformer'].max_seq_length
     )
 
     print(f"{bcolors.CYAN}{model_response:>12}{bcolors.ENDC}")
