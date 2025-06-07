@@ -60,18 +60,20 @@ model.eval()
 # 
 user_prompt_string = f'  Talk to {bcolors.CYAN}q{bcolors.ENDC}{bcolors.BLUE}T{bcolors.ENDC}: '
 
-context = ''
+context = '<s><|system|> You are a helpful assistant. '
 while True:
     user_input = str(input(user_prompt_string))
 
     if user_input in ['q', 'quit']:
         print('')
         break
+
+    user_input =  '<|user|>' + user_input + '<|assistant|>'
     
     # add user input to context
     context += user_input
     # cutoff context
-    context = context[:1024]
+    context = context[-1024:]
 
     model_response = model.decode(
         text = context,
