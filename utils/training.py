@@ -131,7 +131,7 @@ class Trainer:
             self.s3_client.upload_file(summary_path, self.config.s3_bucket, summary_s3_key)
 
         # Save a plain-text summary of training config and transformer config
-        config_txt_path = os.path.join(self.experiment_dir, "config.txt")
+        config_txt_path = os.path.join(self.experiment_dir, "config.yaml")
         with open(config_txt_path, "w") as f:
             f.write("TrainingConfigs:\n")
             for key, value in asdict(self.config).items():
@@ -140,7 +140,7 @@ class Trainer:
             for key, value in asdict(self.transformer_config).items():
                 f.write(f"{key}: {value}\n")
         if self.s3_client:
-            txt_s3_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/config.txt"
+            txt_s3_key = f"{self.config.s3_prefix}/{self.transformer_config.model_name}/config.yaml"
             self.s3_client.upload_file(config_txt_path, self.config.s3_bucket, txt_s3_key)
 
         # Download existing artifacts from S3 to local dirs

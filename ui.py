@@ -1,4 +1,10 @@
 import os
+import torch
+from transformers import GPT2Tokenizer, GPT2TokenizerFast
+
+from utils.transformer.model import QT
+from utils.configs import load_configs
+from utils.tokenizer import get_tokenizer
 
 class bcolors:
     BLUE = '\033[94m'
@@ -21,20 +27,38 @@ logo_str = f'''
 
 info_string = '''
 
-A 1B parameter language model created by Daniel Plotkin, Jack Hanke, and Nicole Birova.
+A 100M parameter language model created by Daniel Plotkin, Jack Hanke, and Nicole Birova.
 
 Enter 'q' or 'quit' to exit chat window.
 
 '''
 
+# get device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# clear terminal header and print info
 os.system('clear')
 print(logo_str)
 print(info_string)
-# TODO load model, show load progress.
+
+# load config and model
+# model_dir = f'./experiments/qt-finetuned/'
+model_dir = f'./experiments/qt-pretrain/'
+config = load_configs(path=model_dir+f'config.yaml')
+tokenizer = get_tokenizer()
+model = QT(
+    config=config['transformer'],
+    tokenizer=tokenizer,
+    device=device,
+)
+# model_dict = torch.load(model_dir+'checkpoints/qt-finetuned_best.pt')
+model_dict = torch.load(model_dir+'checkpoints/qt-pretrain_best.pt')
+model.load_state_dict(model_dict['model_state_dict'])
+model.eval()
 
 user_prompt_string = f'  Talk to {bcolors.CYAN}q{bcolors.ENDC}{bcolors.BLUE}T{bcolors.ENDC}: '
 
+context = ''
 while True:
     user_input = str(input(user_prompt_string))
 
@@ -42,8 +66,18 @@ while True:
         print('')
         break
 
-    model_response = '''
-    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-    '''
+    context += user_input
+
+    model_response = model.decode(
+        text = context,
+        return_stream = False
+
+    )
 
     print(f"{bcolors.CYAN}{model_response:>12}{bcolors.ENDC}")
+
+    # add response to context
+    context += model_response
+
+
+

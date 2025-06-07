@@ -85,6 +85,7 @@ class QT(nn.Module):
         text: str,
         method: Literal["greedy", "beam", "sample", "topk", "topp"] = "greedy",
         max_tokens: int = 100,
+        return_stream: bool = False,
         return_tokens: bool = False,
         beam_size: int = 3,
         tau: float = 1.0,
@@ -104,20 +105,21 @@ class QT(nn.Module):
         """
         self.eval()
         if method == "greedy":
-            return self._decode_greedy(text, max_tokens=max_tokens, return_tokens=return_tokens)
+            return self._decode_greedy(text, max_tokens=max_tokens, return_tokens=return_tokens, return_stream=return_stream)
         elif method == "beam":
-            return self._decode_beam(text, max_tokens=max_tokens, return_tokens=return_tokens, beam_size=beam_size)
+            return self._decode_beam(text, max_tokens=max_tokens, return_tokens=return_tokens, return_stream=return_stream, beam_size=beam_size)
         elif method == "sample":
-            return self._decode_sample(text, max_tokens=max_tokens, return_tokens=return_tokens, tau=tau)
+            return self._decode_sample(text, max_tokens=max_tokens, return_tokens=return_tokens, return_stream=return_stream, tau=tau)
         elif method == "topk":
             return self._decode_topk(
-                text, max_tokens=max_tokens, return_tokens=return_tokens, k=beam_size
+                text, max_tokens=max_tokens, return_tokens=return_tokens, return_stream=return_stream, k=beam_size
             )
         elif method == "topp":
             return self._decode_topp(
                 text,
                 max_tokens=max_tokens,
                 return_tokens=return_tokens,
+                return_stream=return_stream,
                 p=top_p,
                 tau=tau
             )
@@ -125,7 +127,7 @@ class QT(nn.Module):
             raise ValueError(f"Unsupported decode method: {method}")
 
     @torch.no_grad()
-    def _decode_greedy(self, text: str, max_tokens: int = 100, return_tokens: bool = False) -> Union[str, list[int]]:
+    def _decode_greedy(self, text: str, max_tokens: int = 100, return_tokens: bool = False, return_stream: bool = False) -> Union[str, list[int]]:
         device = next(self.parameters()).device
         tgt = self.tokenizer.encode(text, return_tensors='pt').to(device) # Tokenize text
         inference_tokens = []
@@ -147,10 +149,12 @@ class QT(nn.Module):
 
         if return_tokens:
             return inference_tokens
+        if return_stream:
+            print(self.tokenizer.decode(next_token.item()), end='')
         return self.tokenizer.decode(inference_tokens)
     
     @torch.no_grad()
-    def _decode_beam(self, text: str, max_tokens: int = 100, return_tokens: bool = False, beam_size: int = 3) -> Union[str, list[int]]:
+    def _decode_beam(self, text: str, max_tokens: int = 100, return_tokens: bool = False, return_stream: bool = False, beam_size: int = 3) -> Union[str, list[int]]:
         device = next(self.parameters()).device
         tgt = self.tokenizer.encode(text, return_tensors='pt').to(device)
         sequences = [(tgt, 0)]  # (tokens, log_prob)
@@ -183,7 +187,7 @@ class QT(nn.Module):
         return self.tokenizer.decode(best_seq)
 
     @torch.no_grad()
-    def _decode_sample(self, text: str, max_tokens: int = 100, return_tokens: bool = False, tau: float = 1.0) -> Union[str, list[int]]:
+    def _decode_sample(self, text: str, max_tokens: int = 100, return_tokens: bool = False, return_stream: bool = False, tau: float = 1.0) -> Union[str, list[int]]:
         device = next(self.parameters()).device
         tgt = self.tokenizer.encode(text, return_tensors='pt').to(device) # Tokenize text
         inference_tokens = []
@@ -216,6 +220,7 @@ class QT(nn.Module):
         text: str,
         max_tokens: int = 100,
         return_tokens: bool = False,
+        return_stream: bool = False,
         k: int = 10
     ) -> Union[str, list[int]]:
         """
@@ -251,6 +256,7 @@ class QT(nn.Module):
         text: str,
         max_tokens: int = 100,
         return_tokens: bool = False,
+        return_stream: bool = False,
         p: float = 0.9,
         tau: float = 1.0
     ) -> Union[str, list[int]]:
