@@ -39,10 +39,10 @@ For conversation and instruction tuning:
 
 - Model design:
     - Change parameter precision to `fp32`
-    - ✅ Add smart weight init (word distribution init)
-    - ✅ [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
-    - ✅ Tie embeddings
-    - ✅ Architecture parameters: 
+    - ✔️ Add smart weight init (word distribution init)
+    - ✔️ [ALiBi](https://arxiv.org/pdf/2108.12409) instead of sinusoidal
+    - ✔️ Tie embeddings
+    - ✔️ Architecture parameters: 
         - `tgt_vocab_size` = `50257`
         - `d_model` = `2048`
         - `d_ff` = `8192`
@@ -57,14 +57,17 @@ For conversation and instruction tuning:
 
         Training with AdamW for `fp32` params with take up atleast `24GBs`, and for inference the model will take up `5GBs`.
 
+    - KV Cacheing
+    - Multi-Head Latent Attention
+
 - Training:
-    - Gradient clipping
-    - Perplexity support for training (replace acc metric?)
-    - ✅ External logging
+    - ✔️ Gradient clipping
+    - Perplexity support for training 
+    - ✔️ External logging
 - Data:
-    - Decide how to best pull, tokenize, and save data
-    - Fetch scripts for each source
-    - Script to load portion of data into gpu, include offset
+    - ✔️ Decide how to best pull, tokenize, and save data
+    - ✔️ Fetch scripts for each source
+    - ✔️ Script to load portion of data into gpu, include offset
 
 ## Developer Setup
 
@@ -75,7 +78,6 @@ source ./setup_env.sh
 ```
 
 Before writing any code, make sure your venv is activated, you have pulled changes, and all packages are installed.
-
 
 When training on a server that you plan to disconnect from, run:
 
